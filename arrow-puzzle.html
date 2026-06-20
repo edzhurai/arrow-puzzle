@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arrow Puzzle</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; }
+  canvas { display: block; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+  const GRID = 12;
+  const DX = [0, 1, 0, -1];
+  const DY = [-1, 0, 1, 0];
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  let spacing, originX, originY;
+  let headCol, headRow, dir, shaftLen;
+  let busy = false;
+  let flyAnim = null;
+
+  function layout() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const usable = Math.min(canvas.width, canvas.height) * 0.85;
+    spacing = usable / (GRID - 1);
+    originX = (canvas.width - usable) / 2;
+    originY = (canvas.height - usable) / 2;
+  }
+
+  function gx(col) { return originX + col * spacing; }
+  function gy(row) { return originY + row * spacing; }
+
+  function drawDots() {
+    const r = Math.max(2, spacing * 0.04);
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    for (let row = 0; row < GRID; row++) {
+      for (let col = 0; col < GRID; col++) {
+        ctx.beginPath();
+        ctx.arc(gx(col), gy(row), r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawArrow(offX, offY) {
+    const hx = gx(headCol) + offX;
+    const hy = gy(headRow) + offY;
+    const tx = hx - DX[dir] * shaftLen * spacing;
+    const ty = hy - DY[dir] * shaftLen * spacing;
+
+    const lineW = Math.max(2.5, spacing * 0.055);
+    const headLen = spacing * 0.3;
+    const headW = spacing * 0.18;
+    const px = -DY[dir];
+    const py = DX[dir];
+
+    ctx.strokeStyle = '#e94560';
+    ctx.lineWidth = lineW;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(hx, hy);
+    ctx.stroke();
+
+    const tipX = hx + DX[dir] * headLen;
+    const tipY = hy + DY[dir] * headLen;
+    ctx.fillStyle = '#e94560';
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(hx + px * headW - DX[dir] * lineW * 0.3, hy + py * headW - DY[dir] * lineW * 0.3);
+    ctx.lineTo(hx - px * headW - DX[dir] * lineW * 0.3, hy - py * headW - DY[dir] * lineW * 0.3);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function maxShaft(col, row, d) {
+    switch (d) {
+      case 0: return GRID - 1 - row;
+      case 1: return col;
+      case 2: return row;
+      case 3: return GRID - 1 - col;
+    }
+  }
+
+  function randomArrow() {
+    let attempts = 0;
+    do {
+      dir = Math.floor(Math.random() * 4);
+      headCol = Math.floor(Math.random() * GRID);
+      headRow = Math.floor(Math.random() * GRID);
+      attempts++;
+    } while (maxShaft(headCol, headRow, dir) < 1 && attempts < 200);
+    const mx = maxShaft(headCol, headRow, dir);
+    shaftLen = 1 + Math.floor(Math.random() * mx);
+  }
+
+  function flyDistance() {
+    const tailCol = headCol - DX[dir] * shaftLen;
+    const tailRow = headRow - DY[dir] * shaftLen;
+    switch (dir) {
+      case 0: return tailRow * spacing;
+      case 1: return (GRID - 1 - tailCol) * spacing;
+      case 2: return (GRID - 1 - tailRow) * spacing;
+      case 3: return tailCol * spacing;
+    }
+  }
+
+  function render(offX = 0, offY = 0) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawDots();
+    ctx.save();
+    ctx.beginPath();
+    const clipPad = spacing * 0.3;
+    ctx.rect(originX - clipPad, originY - clipPad, (GRID - 1) * spacing + clipPad * 2, (GRID - 1) * spacing + clipPad * 2);
+    ctx.clip();
+    drawArrow(offX, offY);
+    ctx.restore();
+  }
+
+  function hitTest(px, py) {
+    const hx = gx(headCol);
+    const hy = gy(headRow);
+    const tx = hx - DX[dir] * shaftLen * spacing;
+    const ty = hy - DY[dir] * shaftLen * spacing;
+    const dx = hx - tx;
+    const dy = hy - ty;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return false;
+    let t = ((px - tx) * dx + (py - ty) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const nx = tx + t * dx;
+    const ny = ty + t * dy;
+    const dist = Math.sqrt((px - nx) ** 2 + (py - ny) ** 2);
+    return dist < spacing * 0.45;
+  }
+
+  function fly() {
+    if (busy) return;
+    busy = true;
+    const dist = flyDistance();
+    const speed = spacing * 12;
+    const duration = (dist / speed) * 1000;
+    const startTime = performance.now();
+
+    function ease(t) {
+      return t * t * (3 - 2 * t);
+    }
+
+    function animate(now) {
+      let t = Math.min(1, (now - startTime) / duration);
+      t = ease(t);
+      const d = t * dist;
+      const offX = DX[dir] * d;
+      const offY = DY[dir] * d;
+      render(offX, offY);
+      if (t < 1) {
+        flyAnim = requestAnimationFrame(animate);
+      } else {
+        flyAnim = null;
+        randomArrow();
+        render();
+        busy = false;
+      }
+    }
+    flyAnim = requestAnimationFrame(animate);
+  }
+
+  function handleClick(px, py) {
+    if (busy) return;
+    if (hitTest(px, py)) fly();
+  }
+
+  canvas.addEventListener('click', (e) => handleClick(e.clientX, e.clientY));
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    handleClick(t.clientX, t.clientY);
+  });
+
+  function init() {
+    layout();
+    randomArrow();
+    render();
+  }
+
+  init();
+  window.addEventListener('resize', () => {
+    if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; busy = false; }
+    layout();
+    render();
+  });
+</script>
+</body>
+</html>
