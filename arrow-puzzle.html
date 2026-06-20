@@ -27,6 +27,8 @@
   let flyOffX = 0, flyOffY = 0;
   let cleared = false;
 
+  function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
+
   function layout() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -51,107 +53,87 @@
     }
   }
 
-  function arrowDots(a) {
-    const dots = [];
-    for (let i = 0; i <= a.len; i++) {
-      dots.push({ c: a.col - DX[a.dir] * i, r: a.row - DY[a.dir] * i });
+  function headDir(a) {
+    const p = a.path;
+    const last = p[p.length - 1];
+    const prev = p[p.length - 2];
+    const dc = last.c - prev.c;
+    const dr = last.r - prev.r;
+    if (dc === 0 && dr < 0) return 0;
+    if (dc > 0 && dr === 0) return 1;
+    if (dc === 0 && dr > 0) return 2;
+    return 3;
+  }
+
+  function generateArrow(numBends) {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const path = [];
+      const visited = new Set();
+      let col = randInt(2, GRID - 3);
+      let row = randInt(2, GRID - 3);
+      let dir = randInt(0, 3);
+      let valid = true;
+
+      path.push({ c: col, r: row });
+      visited.add(`${col},${row}`);
+
+      for (let seg = 0; seg <= numBends; seg++) {
+        let maxSteps;
+        switch (dir) {
+          case 0: maxSteps = row; break;
+          case 1: maxSteps = GRID - 1 - col; break;
+          case 2: maxSteps = GRID - 1 - row; break;
+          case 3: maxSteps = col; break;
+        }
+        if (maxSteps < 1) { valid = false; break; }
+        const steps = randInt(1, Math.min(maxSteps, 5));
+
+        for (let s = 1; s <= steps; s++) {
+          const nc = col + DX[dir] * s;
+          const nr = row + DY[dir] * s;
+          const key = `${nc},${nr}`;
+          if (visited.has(key)) { valid = false; break; }
+          visited.add(key);
+          path.push({ c: nc, r: nr });
+        }
+        if (!valid) break;
+
+        col += DX[dir] * steps;
+        row += DY[dir] * steps;
+
+        if (seg < numBends) {
+          dir = Math.random() < 0.5 ? (dir + 1) % 4 : (dir + 3) % 4;
+        }
+      }
+
+      if (valid && path.length >= 3) {
+        return { path, alive: true, stuck: false, glowing: false };
+      }
     }
-    return dots;
-  }
-
-  function dotsOverlap(a, b) {
-    const da = arrowDots(a);
-    const db = arrowDots(b);
-    for (const pa of da)
-      for (const pb of db)
-        if (pa.c === pb.c && pa.r === pb.r) return true;
-    return false;
-  }
-
-  function isHeadOn(a, b) {
-    if (a.col === b.col) {
-      if (a.dir === 0 && b.dir === 2 && b.row < a.row) return true;
-      if (a.dir === 2 && b.dir === 0 && b.row > a.row) return true;
-    }
-    if (a.row === b.row) {
-      if (a.dir === 1 && b.dir === 3 && b.col > a.col) return true;
-      if (a.dir === 3 && b.dir === 1 && b.col < a.col) return true;
-    }
-    return false;
-  }
-
-  function maxShaft(col, row, d) {
-    switch (d) {
-      case 0: return GRID - 1 - row;
-      case 1: return col;
-      case 2: return row;
-      case 3: return GRID - 1 - col;
-    }
-  }
-
-  function makeArrow() {
-    let a;
-    do {
-      const d = Math.floor(Math.random() * 4);
-      const col = Math.floor(Math.random() * GRID);
-      const row = Math.floor(Math.random() * GRID);
-      const mx = maxShaft(col, row, d);
-      if (mx < 1) continue;
-      a = { col, row, dir: d, len: 1 + Math.floor(Math.random() * mx), alive: true, stuck: false, glowing: false };
-    } while (!a);
-    return a;
-  }
-
-  function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
-
-  function newArrow(col, row, dir, len) {
-    return { col, row, dir, len, alive: true, stuck: false, glowing: false };
+    return { path: [{c:2,r:5},{c:3,r:5},{c:4,r:5},{c:4,r:4},{c:4,r:3}], alive: true, stuck: false, glowing: false };
   }
 
   function placeArrows() {
-    const aRow = randInt(3, 8);
-    const aLen = randInt(1, 3);
-    const aCol = randInt(aLen, 5);
-    arrows[0] = newArrow(aCol, aRow, 1, aLen);
-
-    if (Math.random() < 0.2) {
-      // Clear path: B is well off A's row, no shaft crossing
-      const bCol = randInt(aCol + 2, 10);
-      const bRow = randInt(0, Math.max(0, aRow - 3));
-      const bLen = randInt(1, Math.min(3, bRow));
-      arrows[1] = newArrow(bCol, bRow, 1, Math.max(1, bLen));
-      console.log('CLEAR scenario');
-    } else {
-      // Blocked: B faces up (dir=0), shaft extends DOWN through A's row
-      const bCol = randInt(aCol + 2, 9);
-      const headAbove = randInt(Math.max(0, aRow - 4), Math.max(0, aRow - 1));
-      const shaftNeeded = aRow - headAbove;
-      const extraShaft = randInt(0, Math.min(2, GRID - 1 - aRow));
-      arrows[1] = newArrow(bCol, headAbove, 0, shaftNeeded + extraShaft);
-      console.log('BLOCKED scenario');
-    }
-    const bDots = arrowDots(arrows[1]);
-    const aPath = [];
-    let c = arrows[0].col + 1, r = arrows[0].row;
-    while (c < GRID) { aPath.push(`${c},${r}`); c++; }
-    const overlap = bDots.filter(d => aPath.includes(`${d.c},${d.r}`));
-    console.log('A path:', aPath.join(' | '), '\nB dots:', bDots.map(d => `${d.c},${d.r}`).join(' | '), '\nOverlap:', overlap.length ? overlap.map(d => `${d.c},${d.r}`).join(' | ') : 'none');
+    const numBends = randInt(1, 2);
+    arrows = [generateArrow(numBends)];
+    console.log('Arrow path (' + arrows[0].path.length + ' dots, head dir=' + headDir(arrows[0]) + '):',
+      arrows[0].path.map(p => `(${p.c},${p.r})`).join(' → '));
     cleared = false;
   }
 
   function drawArrow(a, offX, offY, color, glow) {
-    const tipX = gx(a.col) + offX;
-    const tipY = gy(a.row) + offY;
-    const tx = tipX - DX[a.dir] * a.len * spacing;
-    const ty = tipY - DY[a.dir] * a.len * spacing;
-
+    const p = a.path;
     const lineW = Math.max(2.5, spacing * 0.055);
     const headLen = spacing * 0.3;
     const headW = spacing * 0.2;
-    const px = -DY[a.dir];
-    const py = DX[a.dir];
-    const baseX = tipX - DX[a.dir] * headLen;
-    const baseY = tipY - DY[a.dir] * headLen;
+    const dir = headDir(a);
+    const perpX = -DY[dir];
+    const perpY = DX[dir];
+
+    const tipX = gx(p[p.length - 1].c) + offX;
+    const tipY = gy(p[p.length - 1].r) + offY;
+    const baseX = tipX - DX[dir] * headLen;
+    const baseY = tipY - DY[dir] * headLen;
 
     if (glow) {
       ctx.shadowColor = '#ffffff';
@@ -161,16 +143,20 @@
     ctx.strokeStyle = color;
     ctx.lineWidth = lineW;
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.moveTo(tx, ty);
+    ctx.moveTo(gx(p[0].c) + offX, gy(p[0].r) + offY);
+    for (let i = 1; i < p.length - 1; i++) {
+      ctx.lineTo(gx(p[i].c) + offX, gy(p[i].r) + offY);
+    }
     ctx.lineTo(baseX, baseY);
     ctx.stroke();
 
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(tipX, tipY);
-    ctx.lineTo(baseX + px * headW, baseY + py * headW);
-    ctx.lineTo(baseX - px * headW, baseY - py * headW);
+    ctx.lineTo(baseX + perpX * headW, baseY + perpY * headW);
+    ctx.lineTo(baseX - perpX * headW, baseY - perpY * headW);
     ctx.closePath();
     ctx.fill();
 
@@ -180,66 +166,35 @@
     }
   }
 
-  function blockerDistance(idx) {
-    const a = arrows[idx];
-    const j = 1 - idx;
-    if (!arrows[j].alive) return Infinity;
-    const otherDots = arrowDots(arrows[j]);
-    let c = a.col + DX[a.dir];
-    let r = a.row + DY[a.dir];
-    let steps = 1;
-    while (c >= 0 && c < GRID && r >= 0 && r < GRID) {
-      for (const d of otherDots)
-        if (d.c === c && d.r === r) return steps * spacing;
-      c += DX[a.dir];
-      r += DY[a.dir];
-      steps++;
-    }
-    return Infinity;
-  }
-
-  function isBlocked(idx) {
-    const a = arrows[idx];
-    const j = 1 - idx;
-    if (!arrows[j].alive) return false;
-    const otherDots = arrowDots(arrows[j]);
-    let c = a.col + DX[a.dir];
-    let r = a.row + DY[a.dir];
-    while (c >= 0 && c < GRID && r >= 0 && r < GRID) {
-      for (const d of otherDots)
-        if (d.c === c && d.r === r) return true;
-      c += DX[a.dir];
-      r += DY[a.dir];
-    }
-    return false;
-  }
-
   function flyDistance(a) {
-    const tailCol = a.col - DX[a.dir] * a.len;
-    const tailRow = a.row - DY[a.dir] * a.len;
-    switch (a.dir) {
-      case 0: return tailRow * spacing;
-      case 1: return (GRID - 1 - tailCol) * spacing;
-      case 2: return (GRID - 1 - tailRow) * spacing;
-      case 3: return tailCol * spacing;
+    const dir = headDir(a);
+    let maxDist = 0;
+    for (const p of a.path) {
+      let dist;
+      switch (dir) {
+        case 0: dist = p.r * spacing; break;
+        case 1: dist = (GRID - 1 - p.c) * spacing; break;
+        case 2: dist = (GRID - 1 - p.r) * spacing; break;
+        case 3: dist = p.c * spacing; break;
+      }
+      maxDist = Math.max(maxDist, dist);
     }
+    return maxDist;
   }
 
   function hitTest(px, py, a) {
-    const hx = gx(a.col);
-    const hy = gy(a.row);
-    const tx = hx - DX[a.dir] * a.len * spacing;
-    const ty = hy - DY[a.dir] * a.len * spacing;
-    const dx = hx - tx;
-    const dy = hy - ty;
-    const len2 = dx * dx + dy * dy;
-    if (len2 === 0) return false;
-    let t = ((px - tx) * dx + (py - ty) * dy) / len2;
-    t = Math.max(0, Math.min(1, t));
-    const nx = tx + t * dx;
-    const ny = ty + t * dy;
-    const dist = Math.sqrt((px - nx) ** 2 + (py - ny) ** 2);
-    return dist < spacing * 0.45;
+    for (let i = 0; i < a.path.length - 1; i++) {
+      const x1 = gx(a.path[i].c), y1 = gy(a.path[i].r);
+      const x2 = gx(a.path[i + 1].c), y2 = gy(a.path[i + 1].r);
+      const dx = x2 - x1, dy = y2 - y1;
+      const len2 = dx * dx + dy * dy;
+      if (len2 === 0) continue;
+      let t = ((px - x1) * dx + (py - y1) * dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const nx = x1 + t * dx, ny = y1 + t * dy;
+      if (Math.sqrt((px - nx) ** 2 + (py - ny) ** 2) < spacing * 0.45) return true;
+    }
+    return false;
   }
 
   function render() {
@@ -252,7 +207,7 @@
     ctx.rect(originX - clipPad, originY - clipPad, (GRID - 1) * spacing + clipPad * 2, (GRID - 1) * spacing + clipPad * 2);
     ctx.clip();
 
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < arrows.length; i++) {
       if (!arrows[i].alive) continue;
       const ox = (i === flyingIdx) ? flyOffX : 0;
       const oy = (i === flyingIdx) ? flyOffY : 0;
@@ -274,42 +229,11 @@
     }
   }
 
-  function bounce(idx) {
-    busy = true;
-    flyingIdx = idx;
-    const a = arrows[idx];
-    const wasStuck = a.stuck;
-    a.stuck = true;
-    const bounceDist = blockerDistance(idx);
-    const duration = Math.max(200, (bounceDist / (spacing * 12)) * 2000);
-    const startTime = performance.now();
-
-    function animate(now) {
-      let t = Math.min(1, (now - startTime) / duration);
-      const d = Math.sin(t * Math.PI) * bounceDist;
-      flyOffX = DX[a.dir] * d;
-      flyOffY = DY[a.dir] * d;
-      a.glowing = wasStuck && t > 0.3 && t < 0.7;
-      render();
-      if (t < 1) {
-        flyAnim = requestAnimationFrame(animate);
-      } else {
-        flyAnim = null;
-        flyingIdx = -1;
-        flyOffX = 0;
-        flyOffY = 0;
-        a.glowing = false;
-        render();
-        busy = false;
-      }
-    }
-    flyAnim = requestAnimationFrame(animate);
-  }
-
   function fly(idx) {
     busy = true;
     flyingIdx = idx;
     const a = arrows[idx];
+    const dir = headDir(a);
     const dist = flyDistance(a);
     const speed = spacing * 12;
     const duration = Math.max(80, (dist / speed) * 1000);
@@ -321,8 +245,8 @@
       let t = Math.min(1, (now - startTime) / duration);
       t = ease(t);
       const d = t * dist;
-      flyOffX = DX[a.dir] * d;
-      flyOffY = DY[a.dir] * d;
+      flyOffX = DX[dir] * d;
+      flyOffY = DY[dir] * d;
       render();
       if (t < 1) {
         flyAnim = requestAnimationFrame(animate);
@@ -332,7 +256,7 @@
         flyOffX = 0;
         flyOffY = 0;
         a.alive = false;
-        if (!arrows[0].alive && !arrows[1].alive) {
+        if (arrows.every(a => !a.alive)) {
           cleared = true;
           render();
           setTimeout(() => { placeArrows(); render(); }, 1000);
@@ -348,11 +272,10 @@
   function handleClick(px, py) {
     if (busy) return;
     if (cleared) return;
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < arrows.length; i++) {
       if (!arrows[i].alive) continue;
       if (hitTest(px, py, arrows[i])) {
-        if (isBlocked(i)) bounce(i);
-        else fly(i);
+        fly(i);
         return;
       }
     }
