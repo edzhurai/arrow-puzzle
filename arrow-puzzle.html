@@ -20,9 +20,13 @@
   const ctx = canvas.getContext('2d');
 
   let spacing, originX, originY;
-  let headCol, headRow, dir, shaftLen;
+  let arrows = [];
   let busy = false;
   let flyAnim = null;
+  let flyingIdx = -1;
+  let flyOffX = 0, flyOffY = 0;
+  let flashIdx = -1;
+  let cleared = false;
 
   function layout() {
     canvas.width = window.innerWidth;
@@ -48,35 +52,33 @@
     }
   }
 
-  function drawArrow(offX, offY) {
-    const hx = gx(headCol) + offX;
-    const hy = gy(headRow) + offY;
-    const tx = hx - DX[dir] * shaftLen * spacing;
-    const ty = hy - DY[dir] * shaftLen * spacing;
+  function arrowDots(a) {
+    const dots = [];
+    for (let i = 0; i <= a.len; i++) {
+      dots.push({ c: a.col - DX[a.dir] * i, r: a.row - DY[a.dir] * i });
+    }
+    return dots;
+  }
 
-    const lineW = Math.max(2.5, spacing * 0.055);
-    const headLen = spacing * 0.3;
-    const headW = spacing * 0.18;
-    const px = -DY[dir];
-    const py = DX[dir];
+  function dotsOverlap(a, b) {
+    const da = arrowDots(a);
+    const db = arrowDots(b);
+    for (const pa of da)
+      for (const pb of db)
+        if (pa.c === pb.c && pa.r === pb.r) return true;
+    return false;
+  }
 
-    ctx.strokeStyle = '#e94560';
-    ctx.lineWidth = lineW;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(tx, ty);
-    ctx.lineTo(hx, hy);
-    ctx.stroke();
-
-    const tipX = hx + DX[dir] * headLen;
-    const tipY = hy + DY[dir] * headLen;
-    ctx.fillStyle = '#e94560';
-    ctx.beginPath();
-    ctx.moveTo(tipX, tipY);
-    ctx.lineTo(hx + px * headW - DX[dir] * lineW * 0.3, hy + py * headW - DY[dir] * lineW * 0.3);
-    ctx.lineTo(hx - px * headW - DX[dir] * lineW * 0.3, hy - py * headW - DY[dir] * lineW * 0.3);
-    ctx.closePath();
-    ctx.fill();
+  function isHeadOn(a, b) {
+    if (a.col === b.col) {
+      if (a.dir === 0 && b.dir === 2 && b.row < a.row) return true;
+      if (a.dir === 2 && b.dir === 0 && b.row > a.row) return true;
+    }
+    if (a.row === b.row) {
+      if (a.dir === 1 && b.dir === 3 && b.col > a.col) return true;
+      if (a.dir === 3 && b.dir === 1 && b.col < a.col) return true;
+    }
+    return false;
   }
 
   function maxShaft(col, row, d) {
@@ -88,22 +90,80 @@
     }
   }
 
-  function randomArrow() {
-    let attempts = 0;
+  function makeArrow() {
+    let a;
     do {
-      dir = Math.floor(Math.random() * 4);
-      headCol = Math.floor(Math.random() * GRID);
-      headRow = Math.floor(Math.random() * GRID);
-      attempts++;
-    } while (maxShaft(headCol, headRow, dir) < 1 && attempts < 200);
-    const mx = maxShaft(headCol, headRow, dir);
-    shaftLen = 1 + Math.floor(Math.random() * mx);
+      const d = Math.floor(Math.random() * 4);
+      const col = Math.floor(Math.random() * GRID);
+      const row = Math.floor(Math.random() * GRID);
+      const mx = maxShaft(col, row, d);
+      if (mx < 1) continue;
+      a = { col, row, dir: d, len: 1 + Math.floor(Math.random() * mx), alive: true };
+    } while (!a);
+    return a;
   }
 
-  function flyDistance() {
-    const tailCol = headCol - DX[dir] * shaftLen;
-    const tailRow = headRow - DY[dir] * shaftLen;
-    switch (dir) {
+  function placeArrows() {
+    arrows[0] = makeArrow();
+    let attempts = 0;
+    do {
+      arrows[1] = makeArrow();
+      attempts++;
+    } while ((dotsOverlap(arrows[0], arrows[1]) || isHeadOn(arrows[0], arrows[1]) || isHeadOn(arrows[1], arrows[0])) && attempts < 500);
+    cleared = false;
+  }
+
+  function drawArrow(a, offX, offY, color) {
+    const hx = gx(a.col) + offX;
+    const hy = gy(a.row) + offY;
+    const tx = hx - DX[a.dir] * a.len * spacing;
+    const ty = hy - DY[a.dir] * a.len * spacing;
+
+    const lineW = Math.max(2.5, spacing * 0.055);
+    const headLen = spacing * 0.3;
+    const headW = spacing * 0.18;
+    const px = -DY[a.dir];
+    const py = DX[a.dir];
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineW;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(hx, hy);
+    ctx.stroke();
+
+    const tipX = hx + DX[a.dir] * headLen;
+    const tipY = hy + DY[a.dir] * headLen;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(hx + px * headW - DX[a.dir] * lineW * 0.3, hy + py * headW - DY[a.dir] * lineW * 0.3);
+    ctx.lineTo(hx - px * headW - DX[a.dir] * lineW * 0.3, hy - py * headW - DY[a.dir] * lineW * 0.3);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function isBlocked(idx) {
+    const a = arrows[idx];
+    const j = 1 - idx;
+    if (!arrows[j].alive) return false;
+    const otherDots = arrowDots(arrows[j]);
+    let c = a.col + DX[a.dir];
+    let r = a.row + DY[a.dir];
+    while (c >= 0 && c < GRID && r >= 0 && r < GRID) {
+      for (const d of otherDots)
+        if (d.c === c && d.r === r) return true;
+      c += DX[a.dir];
+      r += DY[a.dir];
+    }
+    return false;
+  }
+
+  function flyDistance(a) {
+    const tailCol = a.col - DX[a.dir] * a.len;
+    const tailRow = a.row - DY[a.dir] * a.len;
+    switch (a.dir) {
       case 0: return tailRow * spacing;
       case 1: return (GRID - 1 - tailCol) * spacing;
       case 2: return (GRID - 1 - tailRow) * spacing;
@@ -111,23 +171,11 @@
     }
   }
 
-  function render(offX = 0, offY = 0) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawDots();
-    ctx.save();
-    ctx.beginPath();
-    const clipPad = spacing * 0.3;
-    ctx.rect(originX - clipPad, originY - clipPad, (GRID - 1) * spacing + clipPad * 2, (GRID - 1) * spacing + clipPad * 2);
-    ctx.clip();
-    drawArrow(offX, offY);
-    ctx.restore();
-  }
-
-  function hitTest(px, py) {
-    const hx = gx(headCol);
-    const hy = gy(headRow);
-    const tx = hx - DX[dir] * shaftLen * spacing;
-    const ty = hy - DY[dir] * shaftLen * spacing;
+  function hitTest(px, py, a) {
+    const hx = gx(a.col);
+    const hy = gy(a.row);
+    const tx = hx - DX[a.dir] * a.len * spacing;
+    const ty = hy - DY[a.dir] * a.len * spacing;
     const dx = hx - tx;
     const dy = hy - ty;
     const len2 = dx * dx + dy * dy;
@@ -140,30 +188,68 @@
     return dist < spacing * 0.45;
   }
 
-  function fly() {
-    if (busy) return;
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawDots();
+
+    ctx.save();
+    const clipPad = spacing * 0.3;
+    ctx.beginPath();
+    ctx.rect(originX - clipPad, originY - clipPad, (GRID - 1) * spacing + clipPad * 2, (GRID - 1) * spacing + clipPad * 2);
+    ctx.clip();
+
+    for (let i = 0; i < 2; i++) {
+      if (!arrows[i].alive) continue;
+      const ox = (i === flyingIdx) ? flyOffX : 0;
+      const oy = (i === flyingIdx) ? flyOffY : 0;
+      const color = (i === flashIdx) ? '#ffffff' : '#e94560';
+      drawArrow(arrows[i], ox, oy, color);
+    }
+
+    ctx.restore();
+
+    if (cleared) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${spacing * 1.2}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Clear!', canvas.width / 2, canvas.height / 2);
+    }
+  }
+
+  function flash(idx) {
+    flashIdx = idx;
+    render();
+    setTimeout(() => { flashIdx = -1; render(); }, 150);
+  }
+
+  function fly(idx) {
     busy = true;
-    const dist = flyDistance();
+    flyingIdx = idx;
+    const a = arrows[idx];
+    const dist = flyDistance(a);
     const speed = spacing * 12;
-    const duration = (dist / speed) * 1000;
+    const duration = Math.max(80, (dist / speed) * 1000);
     const startTime = performance.now();
 
-    function ease(t) {
-      return t * t * (3 - 2 * t);
-    }
+    function ease(t) { return t * t * (3 - 2 * t); }
 
     function animate(now) {
       let t = Math.min(1, (now - startTime) / duration);
       t = ease(t);
       const d = t * dist;
-      const offX = DX[dir] * d;
-      const offY = DY[dir] * d;
-      render(offX, offY);
+      flyOffX = DX[a.dir] * d;
+      flyOffY = DY[a.dir] * d;
+      render();
       if (t < 1) {
         flyAnim = requestAnimationFrame(animate);
       } else {
         flyAnim = null;
-        randomArrow();
+        flyingIdx = -1;
+        flyOffX = 0;
+        flyOffY = 0;
+        a.alive = false;
+        if (!arrows[0].alive && !arrows[1].alive) cleared = true;
         render();
         busy = false;
       }
@@ -173,7 +259,15 @@
 
   function handleClick(px, py) {
     if (busy) return;
-    if (hitTest(px, py)) fly();
+    if (cleared) return;
+    for (let i = 0; i < 2; i++) {
+      if (!arrows[i].alive) continue;
+      if (hitTest(px, py, arrows[i])) {
+        if (isBlocked(i)) flash(i);
+        else fly(i);
+        return;
+      }
+    }
   }
 
   canvas.addEventListener('click', (e) => handleClick(e.clientX, e.clientY));
@@ -185,13 +279,13 @@
 
   function init() {
     layout();
-    randomArrow();
+    placeArrows();
     render();
   }
 
   init();
   window.addEventListener('resize', () => {
-    if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; busy = false; }
+    if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; busy = false; }
     layout();
     render();
   });
