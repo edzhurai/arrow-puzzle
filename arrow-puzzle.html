@@ -65,7 +65,7 @@
     return 3;
   }
 
-  function generateArrow(numBends) {
+  function generateArrow(numBends, occupied) {
     for (let attempt = 0; attempt < 200; attempt++) {
       const path = [];
       const visited = new Set();
@@ -74,8 +74,10 @@
       let dir = randInt(0, 3);
       let valid = true;
 
+      const key0 = `${col},${row}`;
+      if (occupied && occupied.has(key0)) continue;
       path.push({ c: col, r: row });
-      visited.add(`${col},${row}`);
+      visited.add(key0);
 
       for (let seg = 0; seg <= numBends; seg++) {
         let maxSteps;
@@ -92,7 +94,7 @@
           const nc = col + DX[dir] * s;
           const nr = row + DY[dir] * s;
           const key = `${nc},${nr}`;
-          if (visited.has(key)) { valid = false; break; }
+          if (visited.has(key) || (occupied && occupied.has(key))) { valid = false; break; }
           visited.add(key);
           path.push({ c: nc, r: nr });
         }
@@ -114,10 +116,14 @@
   }
 
   function placeArrows() {
-    const numBends = randInt(1, 2);
-    arrows = [generateArrow(numBends)];
-    console.log('Arrow path (' + arrows[0].path.length + ' dots, head dir=' + headDir(arrows[0]) + '):',
-      arrows[0].path.map(p => `(${p.c},${p.r})`).join(' → '));
+    const a1 = generateArrow(randInt(1, 2));
+    const occupied = new Set(a1.path.map(p => `${p.c},${p.r}`));
+    const a2 = generateArrow(randInt(1, 2), occupied);
+    arrows = [a1, a2];
+    for (let i = 0; i < arrows.length; i++) {
+      console.log('Arrow ' + i + ' (' + arrows[i].path.length + ' dots, head dir=' + headDir(arrows[i]) + '):',
+        arrows[i].path.map(p => `(${p.c},${p.r})`).join(' → '));
+    }
     cleared = false;
   }
 
@@ -269,13 +275,65 @@
     flyAnim = requestAnimationFrame(animate);
   }
 
+  function isBlocked(idx) {
+    const a = arrows[idx];
+    const dir = headDir(a);
+    const head = a.path[a.path.length - 1];
+    const otherDots = new Set();
+    for (let i = 0; i < arrows.length; i++) {
+      if (i === idx || !arrows[i].alive) continue;
+      for (const p of arrows[i].path) otherDots.add(`${p.c},${p.r}`);
+    }
+    let c = head.c + DX[dir], r = head.r + DY[dir];
+    while (c >= 0 && c < GRID && r >= 0 && r < GRID) {
+      if (otherDots.has(`${c},${r}`)) return true;
+      c += DX[dir];
+      r += DY[dir];
+    }
+    return false;
+  }
+
+  function bounce(idx) {
+    busy = true;
+    flyingIdx = idx;
+    const a = arrows[idx];
+    const dir = headDir(a);
+    const bounceDist = spacing * 0.4;
+    const duration = 250;
+    const startTime = performance.now();
+
+    function animate(now) {
+      let t = Math.min(1, (now - startTime) / duration);
+      const phase = t < 0.5 ? t * 2 : 2 - t * 2;
+      flyOffX = DX[dir] * bounceDist * phase;
+      flyOffY = DY[dir] * bounceDist * phase;
+      render();
+      if (t < 1) {
+        flyAnim = requestAnimationFrame(animate);
+      } else {
+        flyAnim = null;
+        flyingIdx = -1;
+        flyOffX = 0;
+        flyOffY = 0;
+        a.stuck = true;
+        render();
+        busy = false;
+      }
+    }
+    flyAnim = requestAnimationFrame(animate);
+  }
+
   function handleClick(px, py) {
     if (busy) return;
     if (cleared) return;
     for (let i = 0; i < arrows.length; i++) {
       if (!arrows[i].alive) continue;
       if (hitTest(px, py, arrows[i])) {
-        fly(i);
+        if (isBlocked(i)) {
+          bounce(i);
+        } else {
+          fly(i);
+        }
         return;
       }
     }
