@@ -103,12 +103,10 @@
   }
 
   function placeArrows() {
-    arrows[0] = makeArrow();
-    let attempts = 0;
-    do {
-      arrows[1] = makeArrow();
-      attempts++;
-    } while ((dotsOverlap(arrows[0], arrows[1]) || isHeadOn(arrows[0], arrows[1]) || isHeadOn(arrows[1], arrows[0])) && attempts < 500);
+    // Arrow A at (3,5) facing right, shaft len 3 — blocked by B
+    arrows[0] = { col: 3, row: 5, dir: 1, len: 3, alive: true, stuck: false, glowing: false };
+    // Arrow B at (7,5) facing up, shaft len 2 — sits in A's path
+    arrows[1] = { col: 7, row: 5, dir: 0, len: 2, alive: true, stuck: false, glowing: false };
     cleared = false;
   }
 
@@ -287,8 +285,13 @@
         flyOffX = 0;
         flyOffY = 0;
         a.alive = false;
-        if (!arrows[0].alive && !arrows[1].alive) cleared = true;
-        render();
+        if (!arrows[0].alive && !arrows[1].alive) {
+          cleared = true;
+          render();
+          setTimeout(() => { placeArrows(); render(); }, 1000);
+        } else {
+          render();
+        }
         busy = false;
       }
     }
