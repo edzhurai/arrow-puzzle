@@ -25,7 +25,6 @@
   let flyAnim = null;
   let flyingIdx = -1;
   let flyOffX = 0, flyOffY = 0;
-  let flashIdx = -1;
   let cleared = false;
 
   function layout() {
@@ -98,7 +97,7 @@
       const row = Math.floor(Math.random() * GRID);
       const mx = maxShaft(col, row, d);
       if (mx < 1) continue;
-      a = { col, row, dir: d, len: 1 + Math.floor(Math.random() * mx), alive: true };
+      a = { col, row, dir: d, len: 1 + Math.floor(Math.random() * mx), alive: true, stuck: false, glowing: false };
     } while (!a);
     return a;
   }
@@ -113,7 +112,7 @@
     cleared = false;
   }
 
-  function drawArrow(a, offX, offY, color) {
+  function drawArrow(a, offX, offY, color, glow) {
     const hx = gx(a.col) + offX;
     const hy = gy(a.row) + offY;
     const tx = hx - DX[a.dir] * a.len * spacing;
@@ -124,6 +123,11 @@
     const headW = spacing * 0.18;
     const px = -DY[a.dir];
     const py = DX[a.dir];
+
+    if (glow) {
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = spacing * 0.4;
+    }
 
     ctx.strokeStyle = color;
     ctx.lineWidth = lineW;
@@ -142,6 +146,11 @@
     ctx.lineTo(hx - px * headW - DX[a.dir] * lineW * 0.3, hy - py * headW - DY[a.dir] * lineW * 0.3);
     ctx.closePath();
     ctx.fill();
+
+    if (glow) {
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+    }
   }
 
   function isBlocked(idx) {
@@ -202,8 +211,11 @@
       if (!arrows[i].alive) continue;
       const ox = (i === flyingIdx) ? flyOffX : 0;
       const oy = (i === flyingIdx) ? flyOffY : 0;
-      const color = (i === flashIdx) ? '#ffffff' : '#e94560';
-      drawArrow(arrows[i], ox, oy, color);
+      let color = '#e94560';
+      let glow = false;
+      if (arrows[i].glowing) { color = '#ffffff'; glow = true; }
+      else if (arrows[i].stuck) { color = '#ffffff'; }
+      drawArrow(arrows[i], ox, oy, color, glow);
     }
 
     ctx.restore();
@@ -217,10 +229,36 @@
     }
   }
 
-  function flash(idx) {
-    flashIdx = idx;
-    render();
-    setTimeout(() => { flashIdx = -1; render(); }, 150);
+  function bounce(idx) {
+    busy = true;
+    flyingIdx = idx;
+    const a = arrows[idx];
+    const wasStuck = a.stuck;
+    a.stuck = true;
+    const bounceDist = spacing * 0.35;
+    const duration = 300;
+    const startTime = performance.now();
+
+    function animate(now) {
+      let t = Math.min(1, (now - startTime) / duration);
+      const d = Math.sin(t * Math.PI) * bounceDist;
+      flyOffX = DX[a.dir] * d;
+      flyOffY = DY[a.dir] * d;
+      a.glowing = wasStuck && t > 0.3 && t < 0.7;
+      render();
+      if (t < 1) {
+        flyAnim = requestAnimationFrame(animate);
+      } else {
+        flyAnim = null;
+        flyingIdx = -1;
+        flyOffX = 0;
+        flyOffY = 0;
+        a.glowing = false;
+        render();
+        busy = false;
+      }
+    }
+    flyAnim = requestAnimationFrame(animate);
   }
 
   function fly(idx) {
@@ -263,7 +301,7 @@
     for (let i = 0; i < 2; i++) {
       if (!arrows[i].alive) continue;
       if (hitTest(px, py, arrows[i])) {
-        if (isBlocked(i)) flash(i);
+        if (isBlocked(i)) bounce(i);
         else fly(i);
         return;
       }
