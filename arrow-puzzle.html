@@ -111,16 +111,18 @@
   }
 
   function drawArrow(a, offX, offY, color, glow) {
-    const hx = gx(a.col) + offX;
-    const hy = gy(a.row) + offY;
-    const tx = hx - DX[a.dir] * a.len * spacing;
-    const ty = hy - DY[a.dir] * a.len * spacing;
+    const tipX = gx(a.col) + offX;
+    const tipY = gy(a.row) + offY;
+    const tx = tipX - DX[a.dir] * a.len * spacing;
+    const ty = tipY - DY[a.dir] * a.len * spacing;
 
     const lineW = Math.max(2.5, spacing * 0.055);
     const headLen = spacing * 0.3;
-    const headW = spacing * 0.18;
+    const headW = spacing * 0.2;
     const px = -DY[a.dir];
     const py = DX[a.dir];
+    const baseX = tipX - DX[a.dir] * headLen;
+    const baseY = tipY - DY[a.dir] * headLen;
 
     if (glow) {
       ctx.shadowColor = '#ffffff';
@@ -132,16 +134,14 @@
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(tx, ty);
-    ctx.lineTo(hx, hy);
+    ctx.lineTo(baseX, baseY);
     ctx.stroke();
 
-    const tipX = hx + DX[a.dir] * headLen;
-    const tipY = hy + DY[a.dir] * headLen;
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(tipX, tipY);
-    ctx.lineTo(hx + px * headW - DX[a.dir] * lineW * 0.3, hy + py * headW - DY[a.dir] * lineW * 0.3);
-    ctx.lineTo(hx - px * headW - DX[a.dir] * lineW * 0.3, hy - py * headW - DY[a.dir] * lineW * 0.3);
+    ctx.lineTo(baseX + px * headW, baseY + py * headW);
+    ctx.lineTo(baseX - px * headW, baseY - py * headW);
     ctx.closePath();
     ctx.fill();
 
@@ -149,6 +149,24 @@
       ctx.shadowColor = 'transparent';
       ctx.shadowBlur = 0;
     }
+  }
+
+  function blockerDistance(idx) {
+    const a = arrows[idx];
+    const j = 1 - idx;
+    if (!arrows[j].alive) return Infinity;
+    const otherDots = arrowDots(arrows[j]);
+    let c = a.col + DX[a.dir];
+    let r = a.row + DY[a.dir];
+    let steps = 1;
+    while (c >= 0 && c < GRID && r >= 0 && r < GRID) {
+      for (const d of otherDots)
+        if (d.c === c && d.r === r) return steps * spacing;
+      c += DX[a.dir];
+      r += DY[a.dir];
+      steps++;
+    }
+    return Infinity;
   }
 
   function isBlocked(idx) {
@@ -233,8 +251,8 @@
     const a = arrows[idx];
     const wasStuck = a.stuck;
     a.stuck = true;
-    const bounceDist = spacing * 0.35;
-    const duration = 300;
+    const bounceDist = blockerDistance(idx);
+    const duration = Math.max(200, (bounceDist / (spacing * 12)) * 2000);
     const startTime = performance.now();
 
     function animate(now) {
