@@ -152,10 +152,9 @@
     ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(gx(p[0].c) + offX, gy(p[0].r) + offY);
-    for (let i = 1; i < p.length - 1; i++) {
+    for (let i = 1; i < p.length; i++) {
       ctx.lineTo(gx(p[i].c) + offX, gy(p[i].r) + offY);
     }
-    ctx.lineTo(baseX, baseY);
     ctx.stroke();
 
     ctx.fillStyle = color;
