@@ -103,10 +103,15 @@
   }
 
   function placeArrows() {
-    // Arrow A at (3,5) facing right, shaft len 3 — blocked by B
+    // Arrow A at (3,5) facing right, shaft len 3
     arrows[0] = { col: 3, row: 5, dir: 1, len: 3, alive: true, stuck: false, glowing: false };
-    // Arrow B at (7,5) facing up, shaft len 2 — sits in A's path
-    arrows[1] = { col: 7, row: 5, dir: 0, len: 2, alive: true, stuck: false, glowing: false };
+    if (Math.random() < 0.2) {
+      // 20%: B is out of A's path — A flies off freely
+      arrows[1] = { col: 7, row: 3, dir: 0, len: 2, alive: true, stuck: false, glowing: false };
+    } else {
+      // 80%: B's head at (7,3) facing down, shaft extends up through (7,4),(7,5) — A hits B's shaft at row 5
+      arrows[1] = { col: 7, row: 3, dir: 2, len: 3, alive: true, stuck: false, glowing: false };
+    }
     cleared = false;
   }
 
