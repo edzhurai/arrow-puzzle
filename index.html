@@ -384,9 +384,9 @@
 
   function drawArrow(a, offX, offY, color, glow) {
     const p = a.path;
-    const lineW = Math.max(2.5, spacing * 0.055);
-    const headLen = Math.max(8, spacing * 0.3);
-    const headW = Math.max(6, spacing * 0.2);
+    const lineW = Math.max(3, spacing * 0.055);
+    const headLen = Math.max(10, spacing * 0.3);
+    const headW = Math.max(8, spacing * 0.2);
     const dir = headDir(a);
     const perpX = -DY[dir];
     const perpY = DX[dir];
@@ -452,9 +452,9 @@
     const pts = [];
     for (let i = 0; i < p.length; i++) pts.push(posOnPath(p, dir, t + i));
 
-    const lineW = Math.max(2.5, spacing * 0.055);
-    const headLen = Math.max(8, spacing * 0.3);
-    const headW = Math.max(6, spacing * 0.2);
+    const lineW = Math.max(3, spacing * 0.055);
+    const headLen = Math.max(10, spacing * 0.3);
+    const headW = Math.max(8, spacing * 0.2);
     const tip = pts[pts.length - 1];
     const pre = pts[pts.length - 2];
     const hdx = tip.x - pre.x, hdy = tip.y - pre.y;
@@ -511,7 +511,7 @@
       let t = ((px - x1) * dx + (py - y1) * dy) / len2;
       t = Math.max(0, Math.min(1, t));
       const nx = x1 + t * dx, ny = y1 + t * dy;
-      if (Math.sqrt((px - nx) ** 2 + (py - ny) ** 2) < spacing * 0.45) return true;
+      if (Math.sqrt((px - nx) ** 2 + (py - ny) ** 2) < Math.max(12, spacing * 0.45)) return true;
     }
     return false;
   }
