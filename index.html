@@ -81,6 +81,7 @@
       path.push({ c: col, r: row });
       visited.add(key0);
 
+      const segLens = [];
       for (let seg = 0; seg <= numBends; seg++) {
         let maxSteps;
         switch (dir) {
@@ -90,8 +91,11 @@
           case 3: maxSteps = col; break;
         }
         if (maxSteps < 1) { valid = false; break; }
+        const minSteps = seg >= 2 ? segLens[seg - 2] + 1 : 1;
+        if (minSteps > maxSteps) { valid = false; break; }
         const maxSeg = Math.min(maxSteps, 5);
-        const steps = Math.random() < 0.6 ? randInt(1, Math.min(maxSeg, 2)) : randInt(1, maxSeg);
+        const steps = Math.random() < 0.6 ? randInt(minSteps, Math.min(maxSeg, Math.max(minSteps, 2))) : randInt(minSteps, maxSeg);
+        segLens.push(steps);
 
         for (let s = 1; s <= steps; s++) {
           const nc = col + DX[dir] * s;
