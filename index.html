@@ -356,10 +356,11 @@
         if (!placed) { success = false; break; }
       }
 
-      if (success && isSolvable(generated)) {
+      if (success && generated.length >= Math.ceil(N / 2) && isSolvable(generated)) {
+        if (generated.length < N) console.warn('Placed ' + generated.length + '/' + N + ' arrows');
         arrows = generated;
         if (puzzleAttempt >= 50) console.warn('Puzzle generation took ' + (puzzleAttempt + 1) + ' attempts');
-        console.log('Puzzle generated (' + puzzleAttempt + ' attempts):');
+        console.log('Puzzle generated (' + puzzleAttempt + ' attempts, ' + arrows.length + ' arrows):');
         for (let i = 0; i < arrows.length; i++) {
           console.log('  Arrow ' + i + ' (' + arrows[i].path.length + ' dots, head dir=' + headDir(arrows[i]) + '):',
             arrows[i].path.map(p => `(${p.c},${p.r})`).join(' → '));
@@ -368,16 +369,16 @@
         return;
       }
     }
-    console.warn('Could not generate solvable puzzle, using minimal fallback');
-    arrows = [{ path: [{c:2,r:5},{c:3,r:5},{c:4,r:5}], alive: true, stuck: false, glowing: false }];
-    cleared = false;
+    console.warn('Could not generate puzzle with >= ' + Math.ceil(N / 2) + ' arrows, reducing target');
+    N = Math.max(1, Math.ceil(N / 2));
+    placeArrows();
   }
 
   function drawArrow(a, offX, offY, color, glow) {
     const p = a.path;
     const lineW = Math.max(2.5, spacing * 0.055);
-    const headLen = spacing * 0.3;
-    const headW = spacing * 0.2;
+    const headLen = Math.max(8, spacing * 0.3);
+    const headW = Math.max(6, spacing * 0.2);
     const dir = headDir(a);
     const perpX = -DY[dir];
     const perpY = DX[dir];
@@ -444,8 +445,8 @@
     for (let i = 0; i < p.length; i++) pts.push(posOnPath(p, dir, t + i));
 
     const lineW = Math.max(2.5, spacing * 0.055);
-    const headLen = spacing * 0.3;
-    const headW = spacing * 0.2;
+    const headLen = Math.max(8, spacing * 0.3);
+    const headW = Math.max(6, spacing * 0.2);
     const tip = pts[pts.length - 1];
     const pre = pts[pts.length - 2];
     const hdx = tip.x - pre.x, hdy = tip.y - pre.y;
