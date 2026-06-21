@@ -8,13 +8,43 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; }
   canvas { display: block; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #hdr {
+    position: fixed; top: 0; left: 0; right: 0; height: 48px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; z-index: 10; color: #fff; font-family: sans-serif;
+    pointer-events: none;
+  }
+  #hdr > * { pointer-events: auto; }
+  #lvl { font-size: 16px; font-weight: bold; }
+  #err { font-size: 14px; color: rgba(255,255,255,0.7); }
+  #hdr-r { display: flex; gap: 8px; align-items: center; }
+  #hint-btn {
+    background: rgba(255,255,255,0.15); border: none; border-radius: 8px;
+    color: #fff; font-size: 14px; padding: 6px 12px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #hint-btn:hover { background: rgba(255,255,255,0.3); }
   #gear {
-    position: fixed; top: 12px; right: 12px; width: 40px; height: 40px;
+    width: 36px; height: 36px;
     background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
-    color: #fff; font-size: 22px; cursor: pointer; z-index: 10;
+    color: #fff; font-size: 20px; cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
   #gear:hover { background: rgba(255,255,255,0.3); }
+  #clear-screen {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(26,26,46,0.92);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 15; color: #fff; font-family: sans-serif;
+  }
+  .cs { text-align: center; }
+  .cs-lvl { font-size: 48px; font-weight: bold; margin-bottom: 8px; }
+  .cs-err { font-size: 20px; color: rgba(255,255,255,0.6); margin-bottom: 28px; }
+  .cs button {
+    background: #e94560; border: none; border-radius: 8px;
+    color: #fff; font-size: 18px; padding: 12px 32px; cursor: pointer;
+  }
+  .cs button:hover { background: #d63850; }
   #panel {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.7);
@@ -43,7 +73,21 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<button id="gear" onclick="openSettings()">&#9881;</button>
+<div id="hdr">
+  <span id="lvl">Level 1</span>
+  <span id="err">Errors: 0</span>
+  <div id="hdr-r">
+    <button id="hint-btn" onclick="useHint()">Hint</button>
+    <button id="gear" onclick="openSettings()">&#9881;</button>
+  </div>
+</div>
+<div id="clear-screen" style="display:none">
+  <div class="cs">
+    <div class="cs-lvl">Level 1</div>
+    <div class="cs-err">0 Errors</div>
+    <button onclick="nextLevel()">Next Level</button>
+  </div>
+</div>
 <div id="panel" style="display:none">
   <div class="pi">
     <h2>Settings</h2>
@@ -89,6 +133,8 @@
   let cleared = false;
   let camScale = 1, camOffX = 0, camOffY = 0;
   let slideT = 0;
+  let level = 1, errors = 0, hints = 0;
+  let clearTimer = null, hintTimer = null;
 
   function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
 
@@ -440,14 +486,6 @@
 
     ctx.restore();
     ctx.restore();
-
-    if (cleared) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${spacing * 1.2}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Clear!', canvas.width / 2, canvas.height / 2);
-    }
   }
 
   function fly(idx) {
@@ -487,7 +525,7 @@
         if (arrows.every(a => !a.alive)) {
           cleared = true;
           render();
-          setTimeout(() => { placeArrows(); render(); }, 1000);
+          showClearScreen();
         } else {
           render();
         }
@@ -565,6 +603,8 @@
       if (hitTest(wx, wy, arrows[i])) {
         const dist = blockerDist(i);
         if (dist > 0) {
+          errors++;
+          updateUI();
           bounce(i, dist);
         } else {
           fly(i);
@@ -694,6 +734,52 @@
     p.style.display = 'flex';
   }
 
+  function updateUI() {
+    document.getElementById('lvl').textContent = 'Level ' + level;
+    document.getElementById('err').textContent = 'Errors: ' + errors;
+  }
+
+  function useHint() {
+    if (busy || cleared) return;
+    if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
+    for (const a of arrows) a.glowing = false;
+    hints++;
+    for (let i = 0; i < arrows.length; i++) {
+      if (!arrows[i].alive) continue;
+      if (blockerDist(i) < 0) {
+        arrows[i].glowing = true;
+        render();
+        hintTimer = setTimeout(() => {
+          arrows[i].glowing = false;
+          hintTimer = null;
+          render();
+        }, 800);
+        return;
+      }
+    }
+  }
+
+  function showClearScreen() {
+    const cs = document.getElementById('clear-screen');
+    cs.querySelector('.cs-lvl').textContent = 'Level ' + level;
+    cs.querySelector('.cs-err').textContent = errors + ' Error' + (errors !== 1 ? 's' : '');
+    cs.style.display = 'flex';
+    clearTimer = setTimeout(nextLevel, 3000);
+  }
+
+  function nextLevel() {
+    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
+    document.getElementById('clear-screen').style.display = 'none';
+    level++;
+    errors = 0;
+    hints = 0;
+    cleared = false;
+    camScale = 1; camOffX = 0; camOffY = 0;
+    placeArrows();
+    updateUI();
+    render();
+  }
+
   function applySettings() {
     settings.grid = parseInt(document.querySelector('input[name=grid]:checked').value);
     settings.arrows = parseInt(document.querySelector('input[name=arrows]:checked').value);
@@ -703,10 +789,14 @@
     N = settings.arrows;
     GRID = settings.grid;
     document.getElementById('panel').style.display = 'none';
+    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
+    document.getElementById('clear-screen').style.display = 'none';
     if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
+    errors = 0; hints = 0; cleared = false;
     layout();
     camScale = 1; camOffX = 0; camOffY = 0;
     placeArrows();
+    updateUI();
     render();
   }
 
