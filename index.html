@@ -108,7 +108,8 @@
 <body>
 <canvas id="c"></canvas>
 <div id="hdr">
-  <span id="lvl" onclick="devTap()">Level 1</span>
+  <span id="lvl">Level 1</span>
+  <button class="hdr-btn" onclick="openDevPanel()" style="font-size:10px;padding:3px 6px;opacity:0.5">DEV</button>
   <span id="err">Errors: 0</span>
   <div id="hdr-r">
     <button class="hdr-btn" onclick="resetCam();render()">&#8634;</button>
@@ -189,7 +190,7 @@
   let slideT = 0;
   let level = 1, errors = 0, hints = 0;
   let clearTimer = null, hintTimer = null;
-  let devMode = false, devTapCount = 0, devTapTimer = null;
+  let devMode = false;
   let devParams = { cols: 15, rows: 15, arrows: 35, minSeg: 1, maxSeg: 5, maxBends: 4, maxAttempts: 200 };
 
   function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
@@ -890,17 +891,6 @@
     placeArrows();
     updateUI();
     render();
-  }
-
-  function devTap() {
-    devTapCount++;
-    console.log('devTap count=' + devTapCount);
-    if (devTapTimer) clearTimeout(devTapTimer);
-    devTapTimer = setTimeout(() => { console.log('devTap reset (timeout)'); devTapCount = 0; }, 600);
-    if (devTapCount >= 3) {
-      devTapCount = 0;
-      openDevPanel();
-    }
   }
 
   function openDevPanel() {
