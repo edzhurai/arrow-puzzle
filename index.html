@@ -655,10 +655,11 @@
     const gw = (COLS - 1) * spacing;
     const gh = (ROWS - 1) * spacing;
     const margin = 50;
+    const hdrH = document.getElementById('hdr').offsetHeight || 44;
     const minOffX = Math.max(-margin - originX * camScale, margin - (originX + gw) * camScale);
     const maxOffX = Math.min(canvas.width - margin - originX * camScale, canvas.width + margin - (originX + gw) * camScale);
     if (minOffX < maxOffX) camOffX = Math.max(minOffX, Math.min(maxOffX, camOffX));
-    const minOffY = Math.max(-margin - originY * camScale, margin - (originY + gh) * camScale);
+    const minOffY = Math.max(hdrH - originY * camScale, margin - (originY + gh) * camScale);
     const maxOffY = Math.min(canvas.height - margin - originY * camScale, canvas.height + margin - (originY + gh) * camScale);
     if (minOffY < maxOffY) camOffY = Math.max(minOffY, Math.min(maxOffY, camOffY));
   }
