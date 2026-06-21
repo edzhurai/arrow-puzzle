@@ -200,6 +200,7 @@
     const usableH = canvas.height * 0.85;
     spacing = Math.min(usableW / (COLS - 1), usableH / (ROWS - 1));
     originX = (canvas.width - (COLS - 1) * spacing) / 2;
+    console.log('layout: canvas=' + canvas.width + 'x' + canvas.height + ' COLS=' + COLS + ' ROWS=' + ROWS + ' spacing=' + spacing.toFixed(1) + ' origin=' + originX.toFixed(1) + ',' + originY);
     originY = (canvas.height - (ROWS - 1) * spacing) / 2;
   }
 
@@ -643,7 +644,10 @@
     flyAnim = requestAnimationFrame(animate);
   }
 
-  function resetCam() { camScale = 1; camOffX = 0; camOffY = 0; }
+  function resetCam() {
+    camScale = 1; camOffX = 0; camOffY = 0;
+    console.log('resetCam: scale=' + camScale + ' offX=' + camOffX + ' offY=' + camOffY);
+  }
 
   function clampCam() {
     const gw = (COLS - 1) * spacing;
@@ -889,8 +893,9 @@
 
   function devTap() {
     devTapCount++;
+    console.log('devTap count=' + devTapCount);
     if (devTapTimer) clearTimeout(devTapTimer);
-    devTapTimer = setTimeout(() => { devTapCount = 0; }, 600);
+    devTapTimer = setTimeout(() => { console.log('devTap reset (timeout)'); devTapCount = 0; }, 600);
     if (devTapCount >= 5) {
       devTapCount = 0;
       openDevPanel();
