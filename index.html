@@ -28,6 +28,7 @@
   let flyOffX = 0, flyOffY = 0;
   let cleared = false;
   let camScale = 1, camOffX = 0, camOffY = 0;
+  let slideT = 0;
 
   function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
 
@@ -257,6 +258,65 @@
     }
   }
 
+  function posOnPath(path, dir, d) {
+    const pathLen = path.length - 1;
+    if (d <= 0) {
+      return { x: gx(path[0].c), y: gy(path[0].r) };
+    } else if (d >= pathLen) {
+      const excess = d - pathLen;
+      const head = path[path.length - 1];
+      return {
+        x: gx(head.c) + excess * DX[dir] * spacing,
+        y: gy(head.r) + excess * DY[dir] * spacing
+      };
+    } else {
+      const seg = Math.floor(d);
+      const frac = d - seg;
+      const x1 = gx(path[seg].c), y1 = gy(path[seg].r);
+      const x2 = gx(path[seg + 1].c), y2 = gy(path[seg + 1].r);
+      return { x: x1 + frac * (x2 - x1), y: y1 + frac * (y2 - y1) };
+    }
+  }
+
+  function drawSlidingArrow(a, t, color, glow) {
+    const p = a.path;
+    const dir = headDir(a);
+    const pts = [];
+    for (let i = 0; i < p.length; i++) pts.push(posOnPath(p, dir, t + i));
+
+    const lineW = Math.max(2.5, spacing * 0.055);
+    const headLen = spacing * 0.3;
+    const headW = spacing * 0.2;
+    const tip = pts[pts.length - 1];
+    const pre = pts[pts.length - 2];
+    const hdx = tip.x - pre.x, hdy = tip.y - pre.y;
+    const hlen = Math.sqrt(hdx * hdx + hdy * hdy) || 1;
+    const ux = hdx / hlen, uy = hdy / hlen;
+    const px = -uy, py = ux;
+    const bx = tip.x - ux * headLen, by = tip.y - uy * headLen;
+
+    if (glow) { ctx.shadowColor = '#ffffff'; ctx.shadowBlur = spacing * 0.4; }
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineW;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(tip.x, tip.y);
+    ctx.lineTo(bx + px * headW, by + py * headW);
+    ctx.lineTo(bx - px * headW, by - py * headW);
+    ctx.closePath();
+    ctx.fill();
+
+    if (glow) { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; }
+  }
+
   function flyDistance(a) {
     const dir = headDir(a);
     let maxDist = 0;
@@ -305,13 +365,17 @@
 
     for (let i = 0; i < arrows.length; i++) {
       if (!arrows[i].alive) continue;
-      const ox = (i === flyingIdx) ? flyOffX : 0;
-      const oy = (i === flyingIdx) ? flyOffY : 0;
       let color = '#e94560';
       let glow = false;
       if (arrows[i].glowing) { color = '#ffffff'; glow = true; }
       else if (arrows[i].stuck) { color = '#ffffff'; }
-      drawArrow(arrows[i], ox, oy, color, glow);
+      if (i === flyingIdx && slideT > 0) {
+        drawSlidingArrow(arrows[i], slideT, color, glow);
+      } else {
+        const ox = (i === flyingIdx) ? flyOffX : 0;
+        const oy = (i === flyingIdx) ? flyOffY : 0;
+        drawArrow(arrows[i], ox, oy, color, glow);
+      }
     }
 
     ctx.restore();
@@ -331,9 +395,19 @@
     flyingIdx = idx;
     const a = arrows[idx];
     const dir = headDir(a);
-    const dist = flyDistance(a);
+    const pathLen = a.path.length - 1;
+    const head = a.path[pathLen];
+    let exitDist;
+    switch (dir) {
+      case 0: exitDist = head.r + 2; break;
+      case 1: exitDist = GRID - 1 - head.c + 2; break;
+      case 2: exitDist = GRID - 1 - head.r + 2; break;
+      case 3: exitDist = head.c + 2; break;
+    }
+    const totalDist = pathLen + exitDist;
+    const totalPixels = totalDist * spacing;
     const speed = spacing * 24;
-    const duration = Math.max(80, (dist / speed) * 1000);
+    const duration = Math.max(80, (totalPixels / speed) * 1000);
     const startTime = performance.now();
 
     function ease(t) { return t * t * (3 - 2 * t); }
@@ -341,17 +415,14 @@
     function animate(now) {
       let t = Math.min(1, (now - startTime) / duration);
       t = ease(t);
-      const d = t * dist;
-      flyOffX = DX[dir] * d;
-      flyOffY = DY[dir] * d;
+      slideT = t * totalDist;
       render();
       if (t < 1) {
         flyAnim = requestAnimationFrame(animate);
       } else {
         flyAnim = null;
         flyingIdx = -1;
-        flyOffX = 0;
-        flyOffY = 0;
+        slideT = 0;
         a.alive = false;
         if (arrows.every(a => !a.alive)) {
           cleared = true;
@@ -550,7 +621,7 @@
 
   init();
   window.addEventListener('resize', () => {
-    if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; busy = false; }
+    if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
     layout();
     camScale = 1; camOffX = 0; camOffY = 0;
     render();
