@@ -164,6 +164,16 @@
     return null;
   }
 
+  function headsConflict(a, b) {
+    const da = headDir(a);
+    const db = headDir(b);
+    if ((da + 2) % 4 !== db) return false;
+    const ha = a.path[a.path.length - 1];
+    const hb = b.path[b.path.length - 1];
+    if (da === 0 || da === 2) return ha.c === hb.c;
+    return ha.r === hb.r;
+  }
+
   function placeArrows() {
     const a1 = generateArrow(randInt(1, 2));
     const occupied = new Set(a1.path.map(p => `${p.c},${p.r}`));
@@ -221,6 +231,7 @@
               }
             }
           }
+          if (a2 && headsConflict(a1, a2)) a2 = null;
           if (a2) {
             console.log('Collision: arrow 0 blocked by arrow 1 ' + hitNames[hitType]);
             break;
@@ -229,6 +240,12 @@
       }
     }
 
+    if (!a2) {
+      for (let retry = 0; retry < 50; retry++) {
+        const candidate = generateArrow(randInt(1, 2), occupied);
+        if (!headsConflict(a1, candidate)) { a2 = candidate; break; }
+      }
+    }
     if (!a2) a2 = generateArrow(randInt(1, 2), occupied);
     arrows = [a1, a2];
     for (let i = 0; i < arrows.length; i++) {
