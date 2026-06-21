@@ -8,13 +8,66 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; }
   canvas { display: block; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #gear {
+    position: fixed; top: 12px; right: 12px; width: 40px; height: 40px;
+    background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
+    color: #fff; font-size: 22px; cursor: pointer; z-index: 10;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #gear:hover { background: rgba(255,255,255,0.3); }
+  #panel {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 20;
+  }
+  .pi {
+    background: #1a1a2e; border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px; padding: 24px; color: #fff;
+    font-family: sans-serif; min-width: 260px; max-height: 90vh; overflow-y: auto;
+  }
+  .pi h2 { margin-bottom: 12px; font-size: 18px; }
+  .pi .gl { display: block; margin-top: 14px; margin-bottom: 4px; font-size: 12px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; }
+  .pi label { display: block; padding: 3px 0; font-size: 14px; cursor: pointer; }
+  .pi input[type=radio] { margin-right: 6px; }
+  .pi button {
+    margin-top: 20px; width: 100%; padding: 10px; border: none; border-radius: 8px;
+    background: #e94560; color: #fff; font-size: 15px; cursor: pointer;
+  }
+  .pi button:hover { background: #d63850; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<button id="gear" onclick="openSettings()">&#9881;</button>
+<div id="panel" style="display:none">
+  <div class="pi">
+    <h2>Settings</h2>
+    <span class="gl">Grid Size</span>
+    <label><input type="radio" name="grid" value="10"> Small (10&times;10)</label>
+    <label><input type="radio" name="grid" value="15"> Medium (15&times;15)</label>
+    <label><input type="radio" name="grid" value="20"> Large (20&times;20)</label>
+    <span class="gl">Arrow Count</span>
+    <label><input type="radio" name="arrows" value="15"> Light (15)</label>
+    <label><input type="radio" name="arrows" value="35"> Medium (35)</label>
+    <label><input type="radio" name="arrows" value="55"> Dense (55)</label>
+    <span class="gl">Max Bends</span>
+    <label><input type="radio" name="bends" value="straight"> Straight (0)</label>
+    <label><input type="radio" name="bends" value="simple"> Simple (1-2)</label>
+    <label><input type="radio" name="bends" value="complex"> Complex (2-4)</label>
+    <span class="gl">Color</span>
+    <label><input type="radio" name="color" value="multi"> Multicolor</label>
+    <label><input type="radio" name="color" value="mono"> Monochrome</label>
+    <label><input type="radio" name="color" value="bw"> Black &amp; White</label>
+    <button onclick="applySettings()">Apply &amp; New Puzzle</button>
+  </div>
+</div>
 <script>
-  const N = 35;
-  const GRID = 15;
+  // Grid size counts dots, not gaps (e.g. 15 means 15 dots across with 14 gaps between them)
+  const DEFAULTS = { grid: 15, arrows: 35, bends: 'complex', color: 'mono' };
+  let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('arrowPuzzleSettings') || '{}'));
+  let N = settings.arrows;
+  let GRID = settings.grid;
   const DX = [0, 1, 0, -1];
   const DY = [-1, 0, 1, 0];
   const canvas = document.getElementById('c');
@@ -180,7 +233,7 @@
       for (let n = 0; n < N; n++) {
         let placed = false;
         for (let retry = 0; retry < 50; retry++) {
-          const bends = Math.random() < 0.7 ? randInt(0, 1) : randInt(2, 4);
+          const bends = randBends();
           const candidate = generateArrow(bends, occupied);
           if (!candidate) continue;
           let conflict = false;
@@ -365,7 +418,7 @@
 
     for (let i = 0; i < arrows.length; i++) {
       if (!arrows[i].alive) continue;
-      let color = '#e94560';
+      let color = arrowColor(i);
       let glow = false;
       if (arrows[i].glowing) { color = '#ffffff'; glow = true; }
       else if (arrows[i].stuck) { color = '#ffffff'; }
@@ -612,6 +665,43 @@
     }
     if (e.touches.length === 0) { touchMoved = false; lastPinchDist = 0; }
   }, { passive: false });
+
+  function arrowColor(idx) {
+    if (settings.color === 'bw') return '#ffffff';
+    if (settings.color === 'mono') return '#e94560';
+    return `hsl(${(idx * 137.508) % 360}, 75%, 55%)`;
+  }
+
+  function randBends() {
+    if (settings.bends === 'straight') return 0;
+    if (settings.bends === 'simple') return randInt(0, 2);
+    return Math.random() < 0.7 ? randInt(0, 1) : randInt(2, 4);
+  }
+
+  function openSettings() {
+    const p = document.getElementById('panel');
+    ['grid', 'arrows', 'bends', 'color'].forEach(name => {
+      const el = p.querySelector(`input[name=${name}][value="${settings[name]}"]`);
+      if (el) el.checked = true;
+    });
+    p.style.display = 'flex';
+  }
+
+  function applySettings() {
+    settings.grid = parseInt(document.querySelector('input[name=grid]:checked').value);
+    settings.arrows = parseInt(document.querySelector('input[name=arrows]:checked').value);
+    settings.bends = document.querySelector('input[name=bends]:checked').value;
+    settings.color = document.querySelector('input[name=color]:checked').value;
+    localStorage.setItem('arrowPuzzleSettings', JSON.stringify(settings));
+    N = settings.arrows;
+    GRID = settings.grid;
+    document.getElementById('panel').style.display = 'none';
+    if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
+    layout();
+    camScale = 1; camOffX = 0; camOffY = 0;
+    placeArrows();
+    render();
+  }
 
   function init() {
     layout();
