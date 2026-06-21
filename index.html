@@ -10,13 +10,14 @@
   canvas { display: block; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #hdr {
     position: fixed; top: 0; left: 0;
-    width: 100%; height: 44px;
+    width: 100vw; height: 44px; box-sizing: border-box;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 0 12px;
-    padding-right: max(12px, env(safe-area-inset-right, 0px));
-    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding: 0 16px;
     z-index: 10; color: #fff; font-family: sans-serif;
-    pointer-events: none; overflow: visible;
+    pointer-events: none;
+  }
+  @supports (padding: env(safe-area-inset-right)) {
+    #hdr { padding-right: calc(16px + env(safe-area-inset-right)); padding-left: calc(16px + env(safe-area-inset-left)); }
   }
   #hdr > * { pointer-events: auto; }
   #lvl { font-size: 14px; font-weight: bold; white-space: nowrap; }
@@ -24,14 +25,14 @@
   #hdr-r { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
   .hdr-btn {
     background: rgba(255,255,255,0.15); border: none; border-radius: 6px;
-    color: #fff; font-size: 13px; padding: 5px 10px; cursor: pointer;
+    color: #fff; font-size: 13px; padding: 5px 8px; cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
   .hdr-btn:hover { background: rgba(255,255,255,0.3); }
   #gear {
-    width: 32px; height: 32px;
+    width: 30px; height: 30px;
     background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
-    color: #fff; font-size: 18px; cursor: pointer;
+    color: #fff; font-size: 16px; cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
   #gear:hover { background: rgba(255,255,255,0.3); }
