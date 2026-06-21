@@ -13,6 +13,7 @@
 <body>
 <canvas id="c"></canvas>
 <script>
+  const N = 8;
   const GRID = 12;
   const DX = [0, 1, 0, -1];
   const DY = [-1, 0, 1, 0];
@@ -112,55 +113,6 @@
         return { path, alive: true, stuck: false, glowing: false };
       }
     }
-    return { path: [{c:2,r:5},{c:3,r:5},{c:4,r:5},{c:4,r:4},{c:4,r:3}], alive: true, stuck: false, glowing: false };
-  }
-
-  function generateArrowFrom(sc, sr, numBends, occupied) {
-    for (let attempt = 0; attempt < 50; attempt++) {
-      const path = [];
-      const visited = new Set();
-      let col = sc, row = sr;
-      let dir = randInt(0, 3);
-      let valid = true;
-
-      const key0 = `${col},${row}`;
-      if (occupied && occupied.has(key0)) return null;
-      path.push({ c: col, r: row });
-      visited.add(key0);
-
-      for (let seg = 0; seg <= numBends; seg++) {
-        let maxSteps;
-        switch (dir) {
-          case 0: maxSteps = row; break;
-          case 1: maxSteps = GRID - 1 - col; break;
-          case 2: maxSteps = GRID - 1 - row; break;
-          case 3: maxSteps = col; break;
-        }
-        if (maxSteps < 1) { valid = false; break; }
-        const steps = randInt(1, Math.min(maxSteps, 5));
-
-        for (let s = 1; s <= steps; s++) {
-          const nc = col + DX[dir] * s;
-          const nr = row + DY[dir] * s;
-          const key = `${nc},${nr}`;
-          if (visited.has(key) || (occupied && occupied.has(key))) { valid = false; break; }
-          visited.add(key);
-          path.push({ c: nc, r: nr });
-        }
-        if (!valid) break;
-
-        col += DX[dir] * steps;
-        row += DY[dir] * steps;
-
-        if (seg < numBends) {
-          dir = Math.random() < 0.5 ? (dir + 1) % 4 : (dir + 3) % 4;
-        }
-      }
-
-      if (valid && path.length >= 3) {
-        return { path, alive: true, stuck: false, glowing: false };
-      }
-    }
     return null;
   }
 
@@ -174,84 +126,73 @@
     return ha.r === hb.r;
   }
 
-  function placeArrows() {
-    const a1 = generateArrow(randInt(1, 2));
-    const occupied = new Set(a1.path.map(p => `${p.c},${p.r}`));
-    let a2 = null;
-
-    if (Math.random() < 0.8) {
-      const dir = headDir(a1);
-      const head = a1.path[a1.path.length - 1];
-      const forwardDots = [];
-      let c = head.c + DX[dir], r = head.r + DY[dir];
-      while (c >= 0 && c < GRID && r >= 0 && r < GRID) {
-        if (!occupied.has(`${c},${r}`)) forwardDots.push({ c, r });
-        c += DX[dir]; r += DY[dir];
+  function isSolvable(list) {
+    const remaining = list.map(a => ({ path: a.path, dir: headDir(a) }));
+    while (remaining.length > 0) {
+      let found = false;
+      for (let i = 0; i < remaining.length; i++) {
+        const a = remaining[i];
+        const head = a.path[a.path.length - 1];
+        const otherDots = new Set();
+        for (let j = 0; j < remaining.length; j++) {
+          if (j === i) continue;
+          for (const p of remaining[j].path) otherDots.add(`${p.c},${p.r}`);
+        }
+        let blocked = false;
+        let c = head.c + DX[a.dir], r = head.r + DY[a.dir];
+        while (c >= 0 && c < GRID && r >= 0 && r < GRID) {
+          if (otherDots.has(`${c},${r}`)) { blocked = true; break; }
+          c += DX[a.dir]; r += DY[a.dir];
+        }
+        if (!blocked) {
+          remaining.splice(i, 1);
+          found = true;
+          break;
+        }
       }
+      if (!found) return false;
+    }
+    return true;
+  }
 
-      if (forwardDots.length > 0) {
-        const hitType = randInt(0, 2);
-        const hitNames = ['tail', 'mid-shaft', 'head'];
-        const shuffled = [...forwardDots].sort(() => Math.random() - 0.5);
+  function placeArrows() {
+    for (let puzzleAttempt = 0; puzzleAttempt < 200; puzzleAttempt++) {
+      const occupied = new Set();
+      const generated = [];
+      let success = true;
 
-        for (const target of shuffled) {
-          if (hitType === 0) {
-            a2 = generateArrowFrom(target.c, target.r, randInt(1, 2), occupied);
-          } else if (hitType === 2) {
-            a2 = generateArrowFrom(target.c, target.r, randInt(1, 2), occupied);
-            if (a2) a2.path.reverse();
-          } else {
-            const base = generateArrowFrom(target.c, target.r, randInt(0, 1), occupied);
-            if (base && base.path.length >= 2) {
-              const fdc = Math.sign(base.path[1].c - base.path[0].c);
-              const fdr = Math.sign(base.path[1].r - base.path[0].r);
-              let fd;
-              if (fdc === 0 && fdr < 0) fd = 0;
-              else if (fdc > 0 && fdr === 0) fd = 1;
-              else if (fdc === 0 && fdr > 0) fd = 2;
-              else fd = 3;
-              const tailDirs = [0, 1, 2, 3].filter(d => d !== (fd + 2) % 4);
-              const td = tailDirs[randInt(0, tailDirs.length - 1)];
-              const baseOcc = new Set([...occupied, ...base.path.map(p => `${p.c},${p.r}`)]);
-              const tailSteps = randInt(1, 3);
-              const preDots = [];
-              let ok = true;
-              for (let s = tailSteps; s >= 1; s--) {
-                const nc = target.c - DX[td] * s;
-                const nr = target.r - DY[td] * s;
-                if (nc < 0 || nc >= GRID || nr < 0 || nr >= GRID) { ok = false; break; }
-                const key = `${nc},${nr}`;
-                if (baseOcc.has(key)) { ok = false; break; }
-                baseOcc.add(key);
-                preDots.push({ c: nc, r: nr });
-              }
-              if (ok && preDots.length > 0 && preDots.length + base.path.length >= 3) {
-                base.path = [...preDots, ...base.path];
-                a2 = base;
-              }
-            }
+      for (let n = 0; n < N; n++) {
+        let placed = false;
+        for (let retry = 0; retry < 50; retry++) {
+          const candidate = generateArrow(randInt(0, 2), occupied);
+          if (!candidate) continue;
+          let conflict = false;
+          for (const existing of generated) {
+            if (headsConflict(candidate, existing)) { conflict = true; break; }
           }
-          if (a2 && headsConflict(a1, a2)) a2 = null;
-          if (a2) {
-            console.log('Collision: arrow 0 blocked by arrow 1 ' + hitNames[hitType]);
+          if (!conflict) {
+            generated.push(candidate);
+            for (const p of candidate.path) occupied.add(`${p.c},${p.r}`);
+            placed = true;
             break;
           }
         }
+        if (!placed) { success = false; break; }
       }
-    }
 
-    if (!a2) {
-      for (let retry = 0; retry < 50; retry++) {
-        const candidate = generateArrow(randInt(1, 2), occupied);
-        if (!headsConflict(a1, candidate)) { a2 = candidate; break; }
+      if (success && isSolvable(generated)) {
+        arrows = generated;
+        console.log('Puzzle generated (' + puzzleAttempt + ' attempts):');
+        for (let i = 0; i < arrows.length; i++) {
+          console.log('  Arrow ' + i + ' (' + arrows[i].path.length + ' dots, head dir=' + headDir(arrows[i]) + '):',
+            arrows[i].path.map(p => `(${p.c},${p.r})`).join(' → '));
+        }
+        cleared = false;
+        return;
       }
     }
-    if (!a2) a2 = generateArrow(randInt(1, 2), occupied);
-    arrows = [a1, a2];
-    for (let i = 0; i < arrows.length; i++) {
-      console.log('Arrow ' + i + ' (' + arrows[i].path.length + ' dots, head dir=' + headDir(arrows[i]) + '):',
-        arrows[i].path.map(p => `(${p.c},${p.r})`).join(' → '));
-    }
+    console.warn('Could not generate solvable puzzle, using minimal fallback');
+    arrows = [{ path: [{c:2,r:5},{c:3,r:5},{c:4,r:5}], alive: true, stuck: false, glowing: false }];
     cleared = false;
   }
 
