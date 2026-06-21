@@ -9,18 +9,19 @@
   html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; }
   canvas { display: block; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #hdr {
-    position: fixed; top: 0; left: 0; right: 0; height: 44px;
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 44px;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 12px;
-    padding-right: calc(12px + env(safe-area-inset-right, 0px));
-    padding-left: calc(12px + env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
     z-index: 10; color: #fff; font-family: sans-serif;
     pointer-events: none; overflow: visible;
   }
-  #hdr > * { pointer-events: auto; flex-shrink: 0; }
-  #lvl { font-size: 14px; font-weight: bold; }
-  #err { font-size: 13px; color: rgba(255,255,255,0.7); }
-  #hdr-r { display: flex; gap: 6px; align-items: center; }
+  #hdr > * { pointer-events: auto; }
+  #lvl { font-size: 14px; font-weight: bold; white-space: nowrap; }
+  #err { font-size: 13px; color: rgba(255,255,255,0.7); white-space: nowrap; }
+  #hdr-r { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
   .hdr-btn {
     background: rgba(255,255,255,0.15); border: none; border-radius: 6px;
     color: #fff; font-size: 13px; padding: 5px 10px; cursor: pointer;
@@ -648,11 +649,11 @@
     const gw = (COLS - 1) * spacing;
     const gh = (ROWS - 1) * spacing;
     const margin = 50;
-    const minOffX = margin - (originX + gw) * camScale;
-    const maxOffX = canvas.width - margin - originX * camScale;
+    const minOffX = Math.max(-margin - originX * camScale, margin - (originX + gw) * camScale);
+    const maxOffX = Math.min(canvas.width - margin - originX * camScale, canvas.width + margin - (originX + gw) * camScale);
     if (minOffX < maxOffX) camOffX = Math.max(minOffX, Math.min(maxOffX, camOffX));
-    const minOffY = margin - (originY + gh) * camScale;
-    const maxOffY = canvas.height - margin - originY * camScale;
+    const minOffY = Math.max(-margin - originY * camScale, margin - (originY + gh) * camScale);
+    const maxOffY = Math.min(canvas.height - margin - originY * camScale, canvas.height + margin - (originY + gh) * camScale);
     if (minOffY < maxOffY) camOffY = Math.max(minOffY, Math.min(maxOffY, camOffY));
   }
 
@@ -973,6 +974,8 @@
     layout();
     placeArrows();
     render();
+    const hdr = document.getElementById('hdr');
+    console.log('Header debug: innerWidth=' + window.innerWidth + ' hdr.offsetWidth=' + hdr.offsetWidth + ' hdr.scrollWidth=' + hdr.scrollWidth + ' computedPaddingRight=' + getComputedStyle(hdr).paddingRight);
   }
 
   init();
