@@ -112,7 +112,16 @@
       }
 
       if (valid && path.length >= 2) {
-        return { path, alive: true, stuck: false, glowing: false };
+        const last = path[path.length - 1];
+        const prev = path[path.length - 2];
+        const hdc = Math.sign(last.c - prev.c);
+        const hdr = Math.sign(last.r - prev.r);
+        const headProj = hdc * last.c + hdr * last.r;
+        let extremeOk = true;
+        for (const p of path) {
+          if (hdc * p.c + hdr * p.r > headProj) { extremeOk = false; break; }
+        }
+        if (extremeOk) return { path, alive: true, stuck: false, glowing: false };
       }
     }
     return null;
