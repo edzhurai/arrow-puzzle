@@ -21,12 +21,12 @@
   #lvl { font-size: 14px; font-weight: bold; }
   #err { font-size: 13px; color: rgba(255,255,255,0.7); }
   #hdr-r { display: flex; gap: 6px; align-items: center; }
-  #hint-btn {
+  .hdr-btn {
     background: rgba(255,255,255,0.15); border: none; border-radius: 6px;
     color: #fff; font-size: 13px; padding: 5px 10px; cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
-  #hint-btn:hover { background: rgba(255,255,255,0.3); }
+  .hdr-btn:hover { background: rgba(255,255,255,0.3); }
   #gear {
     width: 32px; height: 32px;
     background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
@@ -109,7 +109,8 @@
   <span id="lvl" onclick="devTap()">Level 1</span>
   <span id="err">Errors: 0</span>
   <div id="hdr-r">
-    <button id="hint-btn" onclick="useHint()">Hint</button>
+    <button class="hdr-btn" onclick="resetCam();render()">&#8634;</button>
+    <button id="hint-btn" class="hdr-btn" onclick="useHint()">Hint</button>
     <button id="gear" onclick="openSettings()">&#9881;</button>
   </div>
 </div>
@@ -641,6 +642,20 @@
     flyAnim = requestAnimationFrame(animate);
   }
 
+  function resetCam() { camScale = 1; camOffX = 0; camOffY = 0; }
+
+  function clampCam() {
+    const gw = (COLS - 1) * spacing;
+    const gh = (ROWS - 1) * spacing;
+    const margin = 50;
+    const minOffX = margin - (originX + gw) * camScale;
+    const maxOffX = canvas.width - margin - originX * camScale;
+    if (minOffX < maxOffX) camOffX = Math.max(minOffX, Math.min(maxOffX, camOffX));
+    const minOffY = margin - (originY + gh) * camScale;
+    const maxOffY = canvas.height - margin - originY * camScale;
+    if (minOffY < maxOffY) camOffY = Math.max(minOffY, Math.min(maxOffY, camOffY));
+  }
+
   function zoomAt(sx, sy, factor) {
     const newScale = Math.max(0.5, Math.min(5, camScale * factor));
     const wx = (sx - camOffX) / camScale;
@@ -648,11 +663,12 @@
     camScale = newScale;
     camOffX = sx - wx * camScale;
     camOffY = sy - wy * camScale;
+    clampCam();
   }
 
   function handleClick(px, py) {
-    if (busy) return;
-    if (cleared) return;
+    if (busy) return false;
+    if (cleared) return false;
     const wx = (px - camOffX) / camScale;
     const wy = (py - camOffY) / camScale;
     for (let i = 0; i < arrows.length; i++) {
@@ -666,9 +682,10 @@
         } else {
           fly(i);
         }
-        return;
+        return true;
       }
     }
+    return false;
   }
 
   // --- Mouse pan / click ---
@@ -691,13 +708,14 @@
     if (!dragMoved && Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) > 3) {
       dragMoved = true;
     }
-    if (dragMoved) { camOffX += dx; camOffY += dy; render(); }
+    if (dragMoved) { camOffX += dx; camOffY += dy; clampCam(); render(); }
   });
   window.addEventListener('mouseup', (e) => {
     if (dragging && !dragMoved) handleClick(e.clientX, e.clientY);
     dragging = false; dragMoved = false;
   });
   canvas.addEventListener('mouseleave', () => { dragging = false; dragMoved = false; });
+  canvas.addEventListener('dblclick', (e) => { resetCam(); render(); });
 
   // --- Scroll-wheel zoom ---
   canvas.addEventListener('wheel', (e) => {
@@ -738,6 +756,7 @@
       if (touchMoved) {
         camOffX += tx - lastTouchX;
         camOffY += ty - lastTouchY;
+        clampCam();
         render();
       }
       lastTouchX = tx; lastTouchY = ty;
@@ -750,17 +769,24 @@
       if (lastPinchDist > 0) zoomAt(cx, cy, dist / lastPinchDist);
       camOffX += cx - lastPinchCX;
       camOffY += cy - lastPinchCY;
+      clampCam();
       lastPinchDist = dist;
       lastPinchCX = cx; lastPinchCY = cy;
       render();
     }
   }, { passive: false });
 
+  let lastTapTime = 0;
   canvas.addEventListener('touchend', (e) => {
     e.preventDefault();
     if (e.touches.length === 0 && !touchMoved) {
       const t = e.changedTouches[0];
-      handleClick(t.clientX, t.clientY);
+      const hit = handleClick(t.clientX, t.clientY);
+      if (!hit) {
+        const now = Date.now();
+        if (now - lastTapTime < 300) { resetCam(); render(); lastTapTime = 0; }
+        else { lastTapTime = now; }
+      }
     }
     if (e.touches.length === 1) {
       lastTouchX = e.touches[0].clientX;
@@ -831,7 +857,7 @@
     errors = 0;
     hints = 0;
     cleared = false;
-    camScale = 1; camOffX = 0; camOffY = 0;
+    resetCam();
     placeArrows();
     updateUI();
     render();
@@ -854,7 +880,7 @@
     if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
     errors = 0; hints = 0; cleared = false;
     layout();
-    camScale = 1; camOffX = 0; camOffY = 0;
+    resetCam();
     placeArrows();
     updateUI();
     render();
@@ -908,7 +934,7 @@
     if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
     errors = 0; hints = 0; cleared = false;
     layout();
-    camScale = 1; camOffX = 0; camOffY = 0;
+    resetCam();
     placeArrows();
     updateUI();
     render();
@@ -937,7 +963,7 @@
     times.sort((a, b) => a - b);
     const avg = times.reduce((s, t) => s + t, 0) / times.length;
     console.log(`Generation benchmark (10 runs): avg=${avg.toFixed(1)}ms min=${times[0].toFixed(1)}ms max=${times[times.length-1].toFixed(1)}ms`);
-    camScale = 1; camOffX = 0; camOffY = 0;
+    resetCam();
     errors = 0; hints = 0; cleared = false;
     updateUI();
     render();
@@ -953,7 +979,7 @@
   window.addEventListener('resize', () => {
     if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
     layout();
-    camScale = 1; camOffX = 0; camOffY = 0;
+    resetCam();
     render();
   });
 </script>
