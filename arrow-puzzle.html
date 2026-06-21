@@ -27,6 +27,7 @@
   let flyingIdx = -1;
   let flyOffX = 0, flyOffY = 0;
   let cleared = false;
+  let camScale = 1, camOffX = 0, camOffY = 0;
 
   function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
 
@@ -272,7 +273,12 @@
   }
 
   function render() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.setTransform(camScale, 0, 0, camScale, camOffX, camOffY);
+
     drawDots();
 
     ctx.save();
@@ -292,6 +298,7 @@
       drawArrow(arrows[i], ox, oy, color, glow);
     }
 
+    ctx.restore();
     ctx.restore();
 
     if (cleared) {
@@ -392,12 +399,23 @@
     flyAnim = requestAnimationFrame(animate);
   }
 
+  function zoomAt(sx, sy, factor) {
+    const newScale = Math.max(0.5, Math.min(5, camScale * factor));
+    const wx = (sx - camOffX) / camScale;
+    const wy = (sy - camOffY) / camScale;
+    camScale = newScale;
+    camOffX = sx - wx * camScale;
+    camOffY = sy - wy * camScale;
+  }
+
   function handleClick(px, py) {
     if (busy) return;
     if (cleared) return;
+    const wx = (px - camOffX) / camScale;
+    const wy = (py - camOffY) / camScale;
     for (let i = 0; i < arrows.length; i++) {
       if (!arrows[i].alive) continue;
-      if (hitTest(px, py, arrows[i])) {
+      if (hitTest(wx, wy, arrows[i])) {
         const dist = blockerDist(i);
         if (dist > 0) {
           bounce(i, dist);
@@ -409,12 +427,104 @@
     }
   }
 
-  canvas.addEventListener('click', (e) => handleClick(e.clientX, e.clientY));
+  // --- Mouse pan / click ---
+  let dragging = false, dragMoved = false;
+  let dragStartX = 0, dragStartY = 0;
+  let mouseLastX = 0, mouseLastY = 0;
+
+  canvas.addEventListener('mousedown', (e) => {
+    dragging = true;
+    dragMoved = false;
+    dragStartX = mouseLastX = e.clientX;
+    dragStartY = mouseLastY = e.clientY;
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - mouseLastX;
+    const dy = e.clientY - mouseLastY;
+    mouseLastX = e.clientX;
+    mouseLastY = e.clientY;
+    if (!dragMoved && Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) > 3) {
+      dragMoved = true;
+    }
+    if (dragMoved) { camOffX += dx; camOffY += dy; render(); }
+  });
+  window.addEventListener('mouseup', (e) => {
+    if (dragging && !dragMoved) handleClick(e.clientX, e.clientY);
+    dragging = false; dragMoved = false;
+  });
+  canvas.addEventListener('mouseleave', () => { dragging = false; dragMoved = false; });
+
+  // --- Scroll-wheel zoom ---
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 0.9 : 1.1);
+    render();
+  }, { passive: false });
+
+  // --- Touch pan / pinch-zoom / tap ---
+  let touchStartX = 0, touchStartY = 0;
+  let lastTouchX = 0, lastTouchY = 0;
+  let touchMoved = false;
+  let lastPinchDist = 0, lastPinchCX = 0, lastPinchCY = 0;
+
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      touchStartX = lastTouchX = e.touches[0].clientX;
+      touchStartY = lastTouchY = e.touches[0].clientY;
+      touchMoved = false;
+    } else if (e.touches.length === 2) {
+      touchMoved = true;
+      lastPinchDist = Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY);
+      lastPinchCX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      lastPinchCY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
+      if (!touchMoved && Math.hypot(tx - touchStartX, ty - touchStartY) > 8) {
+        touchMoved = true;
+      }
+      if (touchMoved) {
+        camOffX += tx - lastTouchX;
+        camOffY += ty - lastTouchY;
+        render();
+      }
+      lastTouchX = tx; lastTouchY = ty;
+    } else if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY);
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      if (lastPinchDist > 0) zoomAt(cx, cy, dist / lastPinchDist);
+      camOffX += cx - lastPinchCX;
+      camOffY += cy - lastPinchCY;
+      lastPinchDist = dist;
+      lastPinchCX = cx; lastPinchCY = cy;
+      render();
+    }
+  }, { passive: false });
+
   canvas.addEventListener('touchend', (e) => {
     e.preventDefault();
-    const t = e.changedTouches[0];
-    handleClick(t.clientX, t.clientY);
-  });
+    if (e.touches.length === 0 && !touchMoved) {
+      const t = e.changedTouches[0];
+      handleClick(t.clientX, t.clientY);
+    }
+    if (e.touches.length === 1) {
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
+      lastPinchDist = 0;
+    }
+    if (e.touches.length === 0) { touchMoved = false; lastPinchDist = 0; }
+  }, { passive: false });
 
   function init() {
     layout();
@@ -426,6 +536,7 @@
   window.addEventListener('resize', () => {
     if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; busy = false; }
     layout();
+    camScale = 1; camOffX = 0; camOffY = 0;
     render();
   });
 </script>
