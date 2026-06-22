@@ -1014,7 +1014,7 @@
     console.log('Screen debug: screen.width=' + window.screen.width + ' screen.availWidth=' + window.screen.availWidth + ' devicePixelRatio=' + window.devicePixelRatio);
   }
 
-  init();
+  requestAnimationFrame(() => { init(); });
   window.addEventListener('resize', () => {
     if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
     layout();
