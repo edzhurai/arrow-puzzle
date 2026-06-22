@@ -168,6 +168,9 @@
     <label><input type="radio" name="arrows" value="15"> Light (15)</label>
     <label><input type="radio" name="arrows" value="35"> Medium (35)</label>
     <label><input type="radio" name="arrows" value="55"> Dense (55)</label>
+    <span class="gl">Fill</span>
+    <label><input type="radio" name="fill" value="normal"> Normal</label>
+    <label><input type="radio" name="fill" value="full"> 100% Coverage</label>
     <span class="gl">Max Bends</span>
     <label><input type="radio" name="bends" value="straight"> Straight (0)</label>
     <label><input type="radio" name="bends" value="simple"> Simple (1-2)</label>
@@ -184,7 +187,7 @@
 </div>
 <script>
   // Grid size counts dots, not gaps (e.g. 15 means 15 dots across with 14 gaps between them)
-  const DEFAULTS = { grid: 15, arrows: 35, bends: 'complex', color: 'mono' };
+  const DEFAULTS = { grid: 12, arrows: 35, bends: 'complex', color: 'mono', fill: 'normal' };
   let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('arrowPuzzleSettings') || '{}'));
   let N = settings.arrows;
   let GRID = settings.grid;
@@ -349,7 +352,119 @@
     return true;
   }
 
-  function placeArrows() {
+  function generateFiller(occupied, uncovered) {
+    const shuffled = [...uncovered].sort(() => Math.random() - 0.5);
+    const fillers = [];
+    const used = new Set(occupied);
+    for (const key of shuffled) {
+      if (used.has(key)) continue;
+      const [c, r] = key.split(',').map(Number);
+      const dirs = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+      let placed = false;
+      for (const dir of dirs) {
+        const len = Math.random() < 0.5 ? 1 : 2;
+        const path = [{ c, r }];
+        let valid = true;
+        for (let s = 1; s <= len; s++) {
+          const nc = c + DX[dir] * s;
+          const nr = r + DY[dir] * s;
+          if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) { valid = false; break; }
+          const nk = `${nc},${nr}`;
+          if (used.has(nk)) { valid = false; break; }
+          path.push({ c: nc, r: nr });
+        }
+        if (!valid) continue;
+        const last = path[path.length - 1];
+        const prev = path[path.length - 2];
+        const hdc = Math.sign(last.c - prev.c);
+        const hdr = Math.sign(last.r - prev.r);
+        const headProj = hdc * last.c + hdr * last.r;
+        let extremeOk = true;
+        for (const p of path) {
+          if (hdc * p.c + hdr * p.r > headProj) { extremeOk = false; break; }
+        }
+        if (!extremeOk) continue;
+        for (const p of path) used.add(`${p.c},${p.r}`);
+        fillers.push({ path, alive: true, stuck: false, glowing: false });
+        placed = true;
+        break;
+      }
+      if (!placed) {
+        for (const dir of dirs) {
+          const nc = c + DX[dir];
+          const nr = r + DY[dir];
+          if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
+          const nk = `${nc},${nr}`;
+          if (used.has(nk)) continue;
+          const path = [{ c, r }, { c: nc, r: nr }];
+          for (const p of path) used.add(`${p.c},${p.r}`);
+          fillers.push({ path, alive: true, stuck: false, glowing: false });
+          placed = true;
+          break;
+        }
+      }
+    }
+    return fillers;
+  }
+
+  function placeArrowsFull() {
+    const totalDots = COLS * ROWS;
+    const targetPhase1 = Math.floor(totalDots * 0.85);
+    const maxAttempts = 500;
+    for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
+      const occupied = new Set();
+      const generated = [];
+
+      while (occupied.size < targetPhase1) {
+        let placed = false;
+        for (let retry = 0; retry < 50; retry++) {
+          const bends = randBends();
+          const candidate = generateArrow(bends, occupied);
+          if (!candidate) continue;
+          let conflict = false;
+          for (const existing of generated) {
+            if (headsConflict(candidate, existing)) { conflict = true; break; }
+          }
+          if (!conflict) {
+            generated.push(candidate);
+            for (const p of candidate.path) occupied.add(`${p.c},${p.r}`);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) break;
+      }
+
+      const uncovered = new Set();
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++)
+          if (!occupied.has(`${c},${r}`)) uncovered.add(`${c},${r}`);
+
+      const fillers = generateFiller(occupied, uncovered);
+      const all = generated.concat(fillers);
+
+      const coveredAfter = new Set();
+      for (const a of all) for (const p of a.path) coveredAfter.add(`${p.c},${p.r}`);
+      if (coveredAfter.size < totalDots) continue;
+
+      let hasConflict = false;
+      for (let i = 0; i < all.length && !hasConflict; i++)
+        for (let j = i + 1; j < all.length && !hasConflict; j++)
+          if (headsConflict(all[i], all[j])) hasConflict = true;
+      if (hasConflict) continue;
+
+      if (isSolvable(all)) {
+        arrows = all;
+        console.log('Full coverage puzzle generated (' + puzzleAttempt + ' attempts, ' + arrows.length + ' arrows, ' + coveredAfter.size + '/' + totalDots + ' dots)');
+        cleared = false;
+        return;
+      }
+    }
+    console.warn('Full coverage failed, falling back to normal generation');
+    placeArrowsNormal();
+  }
+
+  function placeArrowsNormal() {
     const maxAttempts = devMode ? devParams.maxAttempts : 200;
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
       const occupied = new Set();
@@ -392,6 +507,11 @@
     console.warn('Could not generate puzzle with >= ' + Math.ceil(N / 2) + ' arrows, reducing target');
     N = Math.max(1, Math.ceil(N / 2));
     placeArrows();
+  }
+
+  function placeArrows() {
+    if (!devMode && settings.fill === 'full') placeArrowsFull();
+    else placeArrowsNormal();
   }
 
   function drawArrow(a, offX, offY, color, glow) {
@@ -850,7 +970,7 @@
 
   function openSettings() {
     const p = document.getElementById('panel');
-    ['grid', 'arrows', 'bends', 'color'].forEach(name => {
+    ['grid', 'arrows', 'bends', 'color', 'fill'].forEach(name => {
       const el = p.querySelector(`input[name=${name}][value="${settings[name]}"]`);
       if (el) el.checked = true;
     });
@@ -908,6 +1028,7 @@
     settings.arrows = parseInt(document.querySelector('input[name=arrows]:checked').value);
     settings.bends = document.querySelector('input[name=bends]:checked').value;
     settings.color = document.querySelector('input[name=color]:checked').value;
+    settings.fill = document.querySelector('input[name=fill]:checked').value;
     localStorage.setItem('arrowPuzzleSettings', JSON.stringify(settings));
     N = settings.arrows;
     GRID = settings.grid;
