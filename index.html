@@ -638,7 +638,7 @@
     const head = a.path[a.path.length - 1];
     const otherDots = new Set();
     for (let i = 0; i < arrows.length; i++) {
-      if (i === idx || !arrows[i].alive || (anims.has(i) && anims.get(i).type === 'fly')) continue;
+      if (i === idx || !arrows[i].alive || anims.has(i)) continue;
       for (const p of arrows[i].path) otherDots.add(`${p.c},${p.r}`);
     }
     let c = head.c + DX[dir], r = head.r + DY[dir];
