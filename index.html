@@ -99,6 +99,18 @@
   .dp .gen { background: #e94560; }
   .dp .time { background: #2d6a4f; }
   .dp .close { background: rgba(255,255,255,0.15); }
+  #dev-pw {
+    position: fixed; top: 44px; left: 16px;
+    background: #0a0a1a; border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px; padding: 8px 10px;
+    display: flex; align-items: center; gap: 6px;
+    z-index: 30; font-family: monospace;
+  }
+  #dev-pw input {
+    width: 80px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px; color: #fff; padding: 4px 6px;
+    font-family: monospace; font-size: 12px; outline: none;
+  }
   #dev-wm {
     position: fixed; bottom: 8px; right: 8px; color: rgba(233,69,96,0.5);
     font: bold 12px monospace; z-index: 5; pointer-events: none;
@@ -109,7 +121,7 @@
 <canvas id="c"></canvas>
 <div id="hdr">
   <span id="lvl">Level 1</span>
-  <button class="hdr-btn" onclick="openDevPanel()" style="font-size:10px;padding:3px 6px;opacity:0.5">DEV</button>
+  <button class="hdr-btn" onclick="showDevPw()" style="font-size:10px;padding:3px 6px;opacity:0.5">DEV</button>
   <span id="err">Errors: 0</span>
   <div id="hdr-r">
     <button class="hdr-btn" onclick="resetCam();render()">&#8634;</button>
@@ -124,6 +136,7 @@
     <button onclick="nextLevel()">Next Level</button>
   </div>
 </div>
+<div id="dev-pw" style="display:none"><input type="password" id="dev-pw-input" placeholder="password"></div>
 <div id="dev-wm" style="display:none">DEV</div>
 <div id="devpanel" style="display:none">
   <div class="dp">
@@ -893,6 +906,31 @@
     updateUI();
     render();
   }
+
+  function showDevPw() {
+    const box = document.getElementById('dev-pw');
+    const inp = document.getElementById('dev-pw-input');
+    if (box.style.display === 'flex') { hideDevPw(); return; }
+    box.style.display = 'flex';
+    inp.value = '';
+    inp.focus();
+  }
+
+  function hideDevPw() {
+    document.getElementById('dev-pw').style.display = 'none';
+    document.getElementById('dev-pw-input').value = '';
+  }
+
+  document.getElementById('dev-pw-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      if (this.value === 'edz') { hideDevPw(); openDevPanel(); }
+      else { hideDevPw(); }
+    } else if (e.key === 'Escape') { hideDevPw(); }
+  });
+
+  document.getElementById('dev-pw-input').addEventListener('blur', function() {
+    setTimeout(hideDevPw, 100);
+  });
 
   function openDevPanel() {
     document.getElementById('dp-cols').value = COLS;
