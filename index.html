@@ -399,9 +399,9 @@
 
   function drawArrow(a, offX, offY, color, glow) {
     const p = a.path;
-    const lineW = Math.max(3, spacing * 0.0715);
-    const headLen = Math.max(10, spacing * 0.3);
-    const headW = Math.max(8, spacing * 0.2);
+    const lineW = Math.max(3, spacing * 0.1);
+    const headLen = Math.max(6, spacing * 0.18);
+    const headW = Math.max(5, spacing * 0.12);
     const dir = headDir(a);
     const perpX = -DY[dir];
     const perpY = DX[dir];
@@ -422,9 +422,10 @@
     ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(gx(p[0].c) + offX, gy(p[0].r) + offY);
-    for (let i = 1; i < p.length; i++) {
+    for (let i = 1; i < p.length - 1; i++) {
       ctx.lineTo(gx(p[i].c) + offX, gy(p[i].r) + offY);
     }
+    ctx.lineTo(baseX, baseY);
     ctx.stroke();
 
     ctx.fillStyle = color;
@@ -467,9 +468,9 @@
     const pts = [];
     for (let i = 0; i < p.length; i++) pts.push(posOnPath(p, dir, t + i));
 
-    const lineW = Math.max(3, spacing * 0.0715);
-    const headLen = Math.max(10, spacing * 0.3);
-    const headW = Math.max(8, spacing * 0.2);
+    const lineW = Math.max(3, spacing * 0.1);
+    const headLen = Math.max(6, spacing * 0.18);
+    const headW = Math.max(5, spacing * 0.12);
     const tip = pts[pts.length - 1];
     const pre = pts[pts.length - 2];
     const hdx = tip.x - pre.x, hdy = tip.y - pre.y;
@@ -486,7 +487,8 @@
     ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    for (let i = 1; i < pts.length - 1; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.lineTo(bx, by);
     ctx.stroke();
 
     ctx.fillStyle = color;
