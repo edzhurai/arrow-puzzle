@@ -196,13 +196,10 @@
 
   let spacing, originX, originY;
   let arrows = [];
-  let busy = false;
-  let flyAnim = null;
-  let flyingIdx = -1;
-  let flyOffX = 0, flyOffY = 0;
   let cleared = false;
   let camScale = 1, camOffX = 0, camOffY = 0;
-  let slideT = 0;
+  const anims = new Map();
+  let animLoop = null;
   let level = 1, errors = 0, hints = 0;
   let clearTimer = null, hintTimer = null;
   let devMode = false;
@@ -549,37 +546,73 @@
     ctx.clip();
 
     for (let i = 0; i < arrows.length; i++) {
-      if (!arrows[i].alive) continue;
-      if (i === flyingIdx) continue;
+      if (!arrows[i].alive || anims.has(i)) continue;
       let color = arrowColor(i);
       let glow = false;
       if (arrows[i].glowing) { color = '#ffffff'; glow = true; }
       else if (arrows[i].stuck) { color = '#ffffff'; }
-      const ox = (i === flyingIdx) ? flyOffX : 0;
-      const oy = (i === flyingIdx) ? flyOffY : 0;
-      drawArrow(arrows[i], ox, oy, color, glow);
+      drawArrow(arrows[i], 0, 0, color, glow);
     }
 
     ctx.restore();
 
-    if (flyingIdx >= 0 && arrows[flyingIdx].alive) {
-      let color = arrowColor(flyingIdx);
+    for (const [i, anim] of anims) {
+      if (!arrows[i].alive) continue;
+      let color = arrowColor(i);
       let glow = false;
-      if (arrows[flyingIdx].glowing) { color = '#ffffff'; glow = true; }
-      else if (arrows[flyingIdx].stuck) { color = '#ffffff'; }
-      if (slideT > 0) {
-        drawSlidingArrow(arrows[flyingIdx], slideT, color, glow);
+      if (arrows[i].glowing) { color = '#ffffff'; glow = true; }
+      else if (arrows[i].stuck) { color = '#ffffff'; }
+      if (anim.type === 'fly') {
+        drawSlidingArrow(arrows[i], anim.slideT, color, glow);
       } else {
-        drawArrow(arrows[flyingIdx], flyOffX, flyOffY, color, glow);
+        drawArrow(arrows[i], anim.offX, anim.offY, color, glow);
       }
     }
 
     ctx.restore();
   }
 
+  function startAnimLoop() {
+    if (animLoop) return;
+    function tick(now) {
+      let anyActive = false;
+      for (const [idx, anim] of anims) {
+        let t = Math.min(1, (now - anim.startTime) / anim.duration);
+        const et = t * t * (3 - 2 * t);
+        if (anim.type === 'fly') {
+          anim.slideT = et * anim.totalDist;
+        } else {
+          const phase = t < 0.5 ? t * 2 : 2 - t * 2;
+          anim.offX = anim.dx * anim.bounceDist * phase;
+          anim.offY = anim.dy * anim.bounceDist * phase;
+        }
+        if (t >= 1) {
+          anims.delete(idx);
+          if (anim.type === 'fly') {
+            arrows[idx].alive = false;
+          } else {
+            arrows[idx].stuck = true;
+          }
+        } else {
+          anyActive = true;
+        }
+      }
+      render();
+      if (anyActive || anims.size > 0) {
+        animLoop = requestAnimationFrame(tick);
+      } else {
+        animLoop = null;
+        if (arrows.every(a => !a.alive)) {
+          cleared = true;
+          render();
+          showClearScreen();
+        }
+      }
+    }
+    animLoop = requestAnimationFrame(tick);
+  }
+
   function fly(idx) {
-    busy = true;
-    flyingIdx = idx;
     const a = arrows[idx];
     const dir = headDir(a);
     const pathLen = a.path.length - 1;
@@ -595,33 +628,8 @@
     const totalPixels = totalDist * spacing;
     const speed = spacing * 24;
     const duration = Math.max(80, (totalPixels / speed) * 1000);
-    const startTime = performance.now();
-
-    function ease(t) { return t * t * (3 - 2 * t); }
-
-    function animate(now) {
-      let t = Math.min(1, (now - startTime) / duration);
-      t = ease(t);
-      slideT = t * totalDist;
-      render();
-      if (t < 1) {
-        flyAnim = requestAnimationFrame(animate);
-      } else {
-        flyAnim = null;
-        flyingIdx = -1;
-        slideT = 0;
-        a.alive = false;
-        if (arrows.every(a => !a.alive)) {
-          cleared = true;
-          render();
-          showClearScreen();
-        } else {
-          render();
-        }
-        busy = false;
-      }
-    }
-    flyAnim = requestAnimationFrame(animate);
+    anims.set(idx, { type: 'fly', startTime: performance.now(), duration, totalDist, slideT: 0 });
+    startAnimLoop();
   }
 
   function blockerDist(idx) {
@@ -630,7 +638,7 @@
     const head = a.path[a.path.length - 1];
     const otherDots = new Set();
     for (let i = 0; i < arrows.length; i++) {
-      if (i === idx || !arrows[i].alive) continue;
+      if (i === idx || !arrows[i].alive || (anims.has(i) && anims.get(i).type === 'fly')) continue;
       for (const p of arrows[i].path) otherDots.add(`${p.c},${p.r}`);
     }
     let c = head.c + DX[dir], r = head.r + DY[dir];
@@ -644,33 +652,11 @@
   }
 
   function bounce(idx, gridDist) {
-    busy = true;
-    flyingIdx = idx;
     const a = arrows[idx];
     const dir = headDir(a);
     const bounceDist = gridDist * spacing;
-    const duration = 250;
-    const startTime = performance.now();
-
-    function animate(now) {
-      let t = Math.min(1, (now - startTime) / duration);
-      const phase = t < 0.5 ? t * 2 : 2 - t * 2;
-      flyOffX = DX[dir] * bounceDist * phase;
-      flyOffY = DY[dir] * bounceDist * phase;
-      render();
-      if (t < 1) {
-        flyAnim = requestAnimationFrame(animate);
-      } else {
-        flyAnim = null;
-        flyingIdx = -1;
-        flyOffX = 0;
-        flyOffY = 0;
-        a.stuck = true;
-        render();
-        busy = false;
-      }
-    }
-    flyAnim = requestAnimationFrame(animate);
+    anims.set(idx, { type: 'bounce', startTime: performance.now(), duration: 250, bounceDist, dx: DX[dir], dy: DY[dir], offX: 0, offY: 0 });
+    startAnimLoop();
   }
 
   function resetCam() {
@@ -721,12 +707,11 @@
   }
 
   function handleClick(px, py) {
-    if (busy) return false;
     if (cleared) return false;
     const wx = (px - camOffX) / camScale;
     const wy = (py - camOffY) / camScale;
     for (let i = 0; i < arrows.length; i++) {
-      if (!arrows[i].alive) continue;
+      if (!arrows[i].alive || anims.has(i)) continue;
       if (hitTest(wx, wy, arrows[i])) {
         const dist = blockerDist(i);
         if (dist > 0) {
@@ -878,7 +863,7 @@
   }
 
   function useHint() {
-    if (busy || cleared) return;
+    if (cleared) return;
     if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
     for (const a of arrows) a.glowing = false;
     hints++;
@@ -932,7 +917,7 @@
     document.getElementById('panel').style.display = 'none';
     if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
     document.getElementById('clear-screen').style.display = 'none';
-    if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
+    if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
     errors = 0; hints = 0; cleared = false;
     layout();
     resetCam();
@@ -1001,7 +986,7 @@
     document.getElementById('devpanel').style.display = 'none';
     if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
     document.getElementById('clear-screen').style.display = 'none';
-    if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
+    if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
     errors = 0; hints = 0; cleared = false;
     layout();
     resetCam();
@@ -1022,7 +1007,7 @@
     document.getElementById('dev-wm').style.display = 'block';
     if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
     document.getElementById('clear-screen').style.display = 'none';
-    if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
+    if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
     layout();
     const times = [];
     for (let run = 0; run < 10; run++) {
@@ -1050,7 +1035,7 @@
 
   requestAnimationFrame(() => { init(); });
   window.addEventListener('resize', () => {
-    if (flyAnim) { cancelAnimationFrame(flyAnim); flyAnim = null; flyingIdx = -1; slideT = 0; busy = false; }
+    if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
     layout();
     resetCam();
     render();
