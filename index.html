@@ -213,8 +213,8 @@
   function layout() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    const usableW = canvas.width * 0.85;
-    const usableH = canvas.height * 0.85;
+    const usableW = canvas.width * 0.70;
+    const usableH = canvas.height * 0.70;
     spacing = Math.min(usableW / (COLS - 1), usableH / (ROWS - 1));
     originX = (canvas.width - (COLS - 1) * spacing) / 2;
     console.log('layout: canvas=' + canvas.width + 'x' + canvas.height + ' COLS=' + COLS + ' ROWS=' + ROWS + ' spacing=' + spacing.toFixed(1) + ' origin=' + originX.toFixed(1) + ',' + originY);
@@ -681,15 +681,21 @@
     const mx = rw * 0.33 * t;
     const my = rh * 0.33 * t;
 
-    const gridL = camOffX + originX * camScale;
-    const gridR = gridL + rw;
-    const gridT = camOffY + originY * camScale;
-    const gridB = gridT + rh;
+    const minX = -mx - originX * camScale;
+    const maxX = canvas.width + mx - originX * camScale - rw;
+    if (minX < maxX) {
+      camOffX = Math.max(minX, Math.min(maxX, camOffX));
+    } else {
+      camOffX = (minX + maxX) / 2;
+    }
 
-    if (gridL > mx) camOffX -= gridL - mx;
-    if (gridR < canvas.width - mx) camOffX += (canvas.width - mx) - gridR;
-    if (gridT > my) camOffY -= gridT - my;
-    if (gridB < canvas.height - my) camOffY += (canvas.height - my) - gridB;
+    const minY = -my - originY * camScale;
+    const maxY = canvas.height + my - originY * camScale - rh;
+    if (minY < maxY) {
+      camOffY = Math.max(minY, Math.min(maxY, camOffY));
+    } else {
+      camOffY = (minY + maxY) / 2;
+    }
   }
 
   function zoomAt(sx, sy, factor) {
