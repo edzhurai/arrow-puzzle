@@ -162,6 +162,8 @@
     <label><input type="radio" name="grid" value="10"> Small (10&times;10)</label>
     <label><input type="radio" name="grid" value="15"> Medium (15&times;15)</label>
     <label><input type="radio" name="grid" value="20"> Large (20&times;20)</label>
+    <label><input type="radio" name="grid" value="25"> XL (25&times;25)</label>
+    <label><input type="radio" name="grid" value="30"> XXL (30&times;30)</label>
     <span class="gl">Arrow Count</span>
     <label><input type="radio" name="arrows" value="15"> Light (15)</label>
     <label><input type="radio" name="arrows" value="35"> Medium (35)</label>
@@ -224,7 +226,7 @@
 
   function drawDots() {
     const r = Math.max(2, spacing * 0.04);
-    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
         ctx.beginPath();
@@ -397,7 +399,7 @@
 
   function drawArrow(a, offX, offY, color, glow) {
     const p = a.path;
-    const lineW = Math.max(3, spacing * 0.055);
+    const lineW = Math.max(3, spacing * 0.0715);
     const headLen = Math.max(10, spacing * 0.3);
     const headW = Math.max(8, spacing * 0.2);
     const dir = headDir(a);
@@ -465,7 +467,7 @@
     const pts = [];
     for (let i = 0; i < p.length; i++) pts.push(posOnPath(p, dir, t + i));
 
-    const lineW = Math.max(3, spacing * 0.055);
+    const lineW = Math.max(3, spacing * 0.0715);
     const headLen = Math.max(10, spacing * 0.3);
     const headW = Math.max(8, spacing * 0.2);
     const tip = pts[pts.length - 1];
@@ -817,10 +819,11 @@
     if (e.touches.length === 0) { touchMoved = false; lastPinchDist = 0; }
   }, { passive: false });
 
+  const PALETTE = ['#e05555', '#e08030', '#8855cc', '#6688cc'];
   function arrowColor(idx) {
     if (settings.color === 'bw') return '#ffffff';
     if (settings.color === 'mono') return '#e94560';
-    return `hsl(${(idx * 137.508) % 360}, 75%, 55%)`;
+    return PALETTE[idx % PALETTE.length];
   }
 
   function randBends() {
