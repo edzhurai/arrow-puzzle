@@ -669,21 +669,27 @@
   }
 
   function clampCam() {
+    const fitScale = 1;
+    const freeThreshold = fitScale * 1.3;
+    if (camScale >= freeThreshold) return;
+
     const gw = (COLS - 1) * spacing;
     const gh = (ROWS - 1) * spacing;
-    const margin = 50;
-    const hdrBottom = document.getElementById('hdr').getBoundingClientRect().bottom;
+    const rw = gw * camScale;
+    const rh = gh * camScale;
+    const t = Math.max(0, 1 - (camScale - fitScale) / (fitScale * 0.3));
+    const mx = rw * 0.33 * t;
+    const my = rh * 0.33 * t;
 
-    const minOffX = Math.max(-margin - originX * camScale, margin - (originX + gw) * camScale);
-    const maxOffX = Math.min(canvas.width - margin - originX * camScale, canvas.width + margin - (originX + gw) * camScale);
-    if (minOffX < maxOffX) camOffX = Math.max(minOffX, Math.min(maxOffX, camOffX));
+    const gridL = camOffX + originX * camScale;
+    const gridR = gridL + rw;
+    const gridT = camOffY + originY * camScale;
+    const gridB = gridT + rh;
 
-    // grid top edge in screen pixels = camOffY + originY * camScale
-    // must never go above hdrBottom
-    const minOffY = hdrBottom - originY * camScale;
-    const maxOffY = Math.min(canvas.height - margin - originY * camScale, canvas.height + margin - (originY + gh) * camScale);
-    camOffY = Math.max(minOffY, Math.min(maxOffY, camOffY));
-    console.log('clampCam: hdrBottom=' + hdrBottom.toFixed(1) + ' camOffY=' + camOffY.toFixed(1) + ' gridTop=' + (camOffY + originY * camScale).toFixed(1));
+    if (gridL > mx) camOffX -= gridL - mx;
+    if (gridR < canvas.width - mx) camOffX += (canvas.width - mx) - gridR;
+    if (gridT > my) camOffY -= gridT - my;
+    if (gridB < canvas.height - my) camOffY += (canvas.height - my) - gridB;
   }
 
   function zoomAt(sx, sy, factor) {
