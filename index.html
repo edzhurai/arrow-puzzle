@@ -550,20 +550,30 @@
 
     for (let i = 0; i < arrows.length; i++) {
       if (!arrows[i].alive) continue;
+      if (i === flyingIdx) continue;
       let color = arrowColor(i);
       let glow = false;
       if (arrows[i].glowing) { color = '#ffffff'; glow = true; }
       else if (arrows[i].stuck) { color = '#ffffff'; }
-      if (i === flyingIdx && slideT > 0) {
-        drawSlidingArrow(arrows[i], slideT, color, glow);
-      } else {
-        const ox = (i === flyingIdx) ? flyOffX : 0;
-        const oy = (i === flyingIdx) ? flyOffY : 0;
-        drawArrow(arrows[i], ox, oy, color, glow);
-      }
+      const ox = (i === flyingIdx) ? flyOffX : 0;
+      const oy = (i === flyingIdx) ? flyOffY : 0;
+      drawArrow(arrows[i], ox, oy, color, glow);
     }
 
     ctx.restore();
+
+    if (flyingIdx >= 0 && arrows[flyingIdx].alive) {
+      let color = arrowColor(flyingIdx);
+      let glow = false;
+      if (arrows[flyingIdx].glowing) { color = '#ffffff'; glow = true; }
+      else if (arrows[flyingIdx].stuck) { color = '#ffffff'; }
+      if (slideT > 0) {
+        drawSlidingArrow(arrows[flyingIdx], slideT, color, glow);
+      } else {
+        drawArrow(arrows[flyingIdx], flyOffX, flyOffY, color, glow);
+      }
+    }
+
     ctx.restore();
   }
 
