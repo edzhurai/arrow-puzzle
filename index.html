@@ -689,12 +689,14 @@
       camOffX = (minX + maxX) / 2;
     }
 
-    const minY = -my - originY * camScale;
+    const hdrBottom = document.getElementById('hdr').getBoundingClientRect().bottom;
+    const hdrMinY = hdrBottom - originY * camScale;
+    const minY = Math.max(hdrMinY, -my - originY * camScale);
     const maxY = canvas.height + my - originY * camScale - rh;
     if (minY < maxY) {
       camOffY = Math.max(minY, Math.min(maxY, camOffY));
     } else {
-      camOffY = (minY + maxY) / 2;
+      camOffY = Math.max(hdrMinY, (minY + maxY) / 2);
     }
   }
 
