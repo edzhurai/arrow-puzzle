@@ -577,8 +577,14 @@
       }
 
       if (occupied.size > bestCov) {
-        best = all.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false }));
-        bestCov = occupied.size;
+        let candidateConflict = false;
+        for (let i = 0; i < all.length && !candidateConflict; i++)
+          for (let j = i + 1; j < all.length && !candidateConflict; j++)
+            if (headsConflict(all[i], all[j])) candidateConflict = true;
+        if (!candidateConflict) {
+          best = all.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false }));
+          bestCov = occupied.size;
+        }
       }
 
       if (occupied.size < totalDots) { stats.coverageFail++; continue; }
