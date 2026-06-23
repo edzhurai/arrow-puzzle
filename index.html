@@ -14,7 +14,7 @@
     height: 44px; box-sizing: border-box;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 16px;
-    z-index: 10; color: #fff; font-family: sans-serif;
+    z-index: 25; color: #fff; font-family: sans-serif;
     pointer-events: none; overflow: hidden;
   }
   @supports (padding: env(safe-area-inset-right)) {
@@ -33,7 +33,6 @@
   .hdr-btn:hover { background: rgba(255,255,255,0.3); }
   .hdr-btn.btn-active { background: rgba(255,255,255,0.5); }
   #gear {
-    position: relative; z-index: 21;
     width: 30px; height: 30px;
     background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
     color: #fff; font-size: 16px; cursor: pointer;
@@ -191,6 +190,7 @@
     <label><input type="radio" name="color" value="mono"> Monochrome</label>
     <label><input type="radio" name="color" value="bw"> Black &amp; White</label>
     <div class="btns">
+      <button class="cancel" onclick="document.getElementById('panel').style.display='none'">Cancel</button>
       <button class="apply" onclick="applySettings()">Apply</button>
     </div>
   </div>
