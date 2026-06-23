@@ -205,7 +205,7 @@
   const anims = new Map();
   let animLoop = null;
   let level = 1, errors = 0, hints = 0, lastCoverage = 100;
-  let clearTimer = null, hintTimer = null;
+  let hintTimer = null;
   let devMode = false;
   let devParams = { cols: 15, rows: 15, arrows: 35, minSeg: 1, maxSeg: 5, maxBends: 4, maxAttempts: 200 };
   let lastWinW = 0, lastWinH = 0;
@@ -1129,14 +1129,15 @@
     cs.querySelector('.cs-lvl').textContent = 'Level ' + level;
     cs.querySelector('.cs-err').textContent = errors + ' Error' + (errors !== 1 ? 's' : '');
     const covEl = cs.querySelector('.cs-cov');
-    covEl.textContent = lastCoverage >= 100 ? '100% Coverage' : lastCoverage.toFixed(1) + '% Coverage';
+    const covPct = lastCoverage >= 100 ? '100%' : lastCoverage.toFixed(1) + '%';
+    const nmin = countFree(arrows);
+    covEl.textContent = covPct + ' Coverage · Nmin=' + nmin;
     covEl.style.color = lastCoverage >= 100 ? '#4ade80' : 'rgba(255,255,255,0.5)';
     cs.style.display = 'flex';
-    clearTimer = setTimeout(nextLevel, 3000);
   }
 
   function nextLevel() {
-    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
+
     document.getElementById('clear-screen').style.display = 'none';
     level++;
     errors = 0;
@@ -1163,7 +1164,7 @@
     devMode = false;
     document.getElementById('dev-wm').style.display = 'none';
     document.getElementById('panel').style.display = 'none';
-    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
+
     document.getElementById('clear-screen').style.display = 'none';
     if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
     errors = 0; hints = 0; cleared = false;
@@ -1232,7 +1233,7 @@
     N = devParams.arrows;
     document.getElementById('dev-wm').style.display = 'block';
     document.getElementById('devpanel').style.display = 'none';
-    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
+
     document.getElementById('clear-screen').style.display = 'none';
     if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
     errors = 0; hints = 0; cleared = false;
@@ -1253,7 +1254,7 @@
     N = devParams.arrows;
     document.getElementById('devpanel').style.display = 'none';
     document.getElementById('dev-wm').style.display = 'block';
-    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
+
     document.getElementById('clear-screen').style.display = 'none';
     if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
     layout();
