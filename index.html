@@ -81,6 +81,13 @@
   .pi .apply:hover { background: #d63850; }
   .pi .cancel { background: rgba(255,255,255,0.15); }
   .pi .cancel:hover { background: rgba(255,255,255,0.25); }
+  .pi .how-to-play {
+    display: block; width: 100%; margin-top: 16px; padding: 8px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; color: rgba(255,255,255,0.6); font-size: 14px;
+    cursor: pointer; text-align: center;
+  }
+  .pi .how-to-play:hover { background: rgba(255,255,255,0.15); color: #fff; }
   #devpanel {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.85);
@@ -90,7 +97,7 @@
   .dp {
     background: #0a0a1a; border: 1px solid #e94560;
     border-radius: 12px; padding: 24px; color: #fff;
-    font-family: monospace; min-width: 260px; max-height: 90vh; overflow-y: auto;
+    font-family: monospace; min-width: 320px; max-height: 90vh; overflow-y: auto;
   }
   .dp h2 { margin-bottom: 12px; font-size: 16px; color: #e94560; }
   .dp label { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; }
@@ -98,6 +105,13 @@
     width: 60px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.2);
     border-radius: 4px; color: #fff; padding: 4px 6px; font-family: monospace; font-size: 13px;
   }
+  .dp select {
+    background: #1a1a2e; border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px; color: #fff; padding: 4px 6px; font-family: monospace; font-size: 13px;
+  }
+  .dp .dp-section { margin-top: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); }
+  .dp .dp-cb { display: flex; align-items: center; gap: 6px; padding: 6px 0; font-size: 13px; cursor: pointer; }
+  .dp .dp-cb input { margin: 0; }
   .dp .btns { display: flex; gap: 6px; margin-top: 16px; }
   .dp button {
     flex: 1; padding: 8px; border: none; border-radius: 6px;
@@ -105,7 +119,15 @@
   }
   .dp .gen { background: #e94560; }
   .dp .time { background: #2d6a4f; }
+  .dp .restore { background: #2d4a6f; }
   .dp .close { background: rgba(255,255,255,0.15); }
+  #dev-sidebar {
+    position: fixed; top: 50px; left: 0; bottom: 0; width: 140px;
+    background: rgba(10,10,26,0.85); border-right: 1px solid rgba(233,69,96,0.3);
+    color: rgba(255,255,255,0.7); font: 11px/1.6 monospace;
+    padding: 8px 6px; z-index: 5; pointer-events: none;
+    overflow: hidden;
+  }
   #dev-pw {
     position: fixed; top: 44px; left: 16px;
     background: #0a0a1a; border: 1px solid rgba(255,255,255,0.2);
@@ -168,27 +190,19 @@
 <div id="panel" style="display:none">
   <div class="pi">
     <h2>Settings</h2>
-    <span class="gl">Grid Size</span>
-    <label><input type="radio" name="grid" value="12"> Small (12&times;12)</label>
-    <label><input type="radio" name="grid" value="15"> Medium (15&times;15)</label>
-    <label><input type="radio" name="grid" value="20"> Large (20&times;20)</label>
-    <label><input type="radio" name="grid" value="25"> XL (25&times;25)</label>
-    <label><input type="radio" name="grid" value="30"> XXL (30&times;30)</label>
-    <span class="gl">Arrow Count</span>
-    <label><input type="radio" name="arrows" value="15"> Light (15)</label>
-    <label><input type="radio" name="arrows" value="35"> Medium (35)</label>
-    <label><input type="radio" name="arrows" value="55"> Dense (55)</label>
-    <span class="gl">Fill</span>
-    <label><input type="radio" name="fill" value="normal"> Normal</label>
-    <label><input type="radio" name="fill" value="full"> 100% Coverage</label>
-    <span class="gl">Max Bends</span>
-    <label><input type="radio" name="bends" value="straight"> Straight (0)</label>
-    <label><input type="radio" name="bends" value="simple"> Simple (1-2)</label>
-    <label><input type="radio" name="bends" value="complex"> Complex (2-4)</label>
+    <span class="gl">Difficulty</span>
+    <label><input type="radio" name="difficulty" value="easy"> Easy</label>
+    <label><input type="radio" name="difficulty" value="medium"> Medium</label>
+    <label><input type="radio" name="difficulty" value="hard"> Hard</label>
+    <label><input type="radio" name="difficulty" value="expert"> Expert</label>
     <span class="gl">Color</span>
     <label><input type="radio" name="color" value="multi"> Multicolor</label>
     <label><input type="radio" name="color" value="mono"> Monochrome</label>
     <label><input type="radio" name="color" value="bw"> Black &amp; White</label>
+    <span class="gl">Dots</span>
+    <label><input type="radio" name="dots" value="show"> Show</label>
+    <label><input type="radio" name="dots" value="hide"> Hide</label>
+    <button class="how-to-play" onclick="alert('How to Play — coming soon!')">How to Play</button>
     <div class="btns">
       <button class="cancel" onclick="document.getElementById('panel').style.display='none'">Cancel</button>
       <button class="apply" onclick="applySettings()">Apply</button>
@@ -198,28 +212,61 @@
 <div id="devpanel" style="display:none">
   <div class="dp">
     <h2>DEV: Generation Parameters</h2>
-    <label>Grid cols <input type="number" id="dp-cols" min="5" max="30" value="15"></label>
-    <label>Grid rows <input type="number" id="dp-rows" min="5" max="30" value="15"></label>
-    <label>Arrow count <input type="number" id="dp-arrows" min="1" max="100" value="35"></label>
+    <label>Grid cols <input type="number" id="dp-cols" min="5" max="50" value="15"></label>
+    <label>Grid rows <input type="number" id="dp-rows" min="5" max="50" value="15"></label>
     <label>Min segment <input type="number" id="dp-minseg" min="1" max="10" value="1"></label>
     <label>Max segment <input type="number" id="dp-maxseg" min="1" max="10" value="5"></label>
-    <label>Max bends <input type="number" id="dp-bends" min="0" max="8" value="4"></label>
-    <label>Max attempts <input type="number" id="dp-attempts" min="1" max="2000" value="200"></label>
+    <label>Min bends <input type="number" id="dp-minbends" min="0" max="8" value="0"></label>
+    <label>Max bends <input type="number" id="dp-maxbends" min="0" max="8" value="4"></label>
+    <label>Fill mode <select id="dp-fill"><option value="normal">Normal</option><option value="full">Full</option></select></label>
+    <label>Nmin min <input type="number" id="dp-nmin-min" min="0" max="20" value="2"></label>
+    <label>Nmin max <input type="number" id="dp-nmin-max" min="0" max="20" value="4"></label>
+    <label>Timeout (s) <input type="number" id="dp-timeout" min="1" max="30" value="5"></label>
+    <label>Color <select id="dp-color"><option value="">Use Settings</option><option value="multi">Multicolor</option><option value="mono">Monochrome</option><option value="bw">B&amp;W</option></select></label>
+    <label>Dots <select id="dp-dots"><option value="">Use Settings</option><option value="show">Show</option><option value="hide">Hide</option></select></label>
+    <div class="dp-section">
+      <label class="dp-cb"><input type="checkbox" id="dp-preserve"> Preserve on refresh</label>
+    </div>
     <div class="btns">
       <button class="close" onclick="closeDevPanel()">Close</button>
+      <button class="restore" onclick="devRestoreFromSettings()">Restore</button>
       <button class="time" onclick="devTimeIt()">Time It</button>
       <button class="gen" onclick="devGenerate()">Generate</button>
     </div>
   </div>
 </div>
+<div id="dev-sidebar" style="display:none"></div>
 <script>
-  // Grid size counts dots, not gaps (e.g. 15 means 15 dots across with 14 gaps between them)
-  const DEFAULTS = { grid: 15, arrows: 35, bends: 'complex', color: 'mono', fill: 'normal' };
+  const DIFFICULTY_PRESETS = {
+    easy:   { grid: 10, fill: 'normal', arrows: 15, bends: 'simple',  nminMin: 8,  nminMax: 12, minSeg: 2, maxSeg: 4, timeout: 5 },
+    medium: { grid: 15, fill: 'normal', arrows: 35, bends: 'complex', nminMin: 4,  nminMax: 7,  minSeg: 1, maxSeg: 5, timeout: 5 },
+    hard:   { grid: 20, fill: 'full',   arrows: 55, bends: 'complex', nminMin: 2,  nminMax: 4,  minSeg: 1, maxSeg: 5, timeout: 5 },
+    expert: { grid: 25, fill: 'full',   arrows: 80, bends: 'complex', nminMin: 1,  nminMax: 2,  minSeg: 1, maxSeg: 5, timeout: 8 },
+  };
+  const DEFAULTS = { difficulty: 'medium', color: 'mono', dots: 'show' };
   const saved = localStorage.getItem('arrowPuzzleSettings');
   let settings = saved ? Object.assign({}, DEFAULTS, JSON.parse(saved)) : Object.assign({}, DEFAULTS);
-  let N = settings.arrows;
-  let GRID = settings.grid;
-  let COLS = GRID, ROWS = GRID;
+  if (!DIFFICULTY_PRESETS[settings.difficulty]) settings.difficulty = 'medium';
+
+  function getEffectiveParams() {
+    if (devMode) {
+      const dp = devParams;
+      const arrows = Math.round(dp.cols * dp.rows * 0.15);
+      return { cols: dp.cols, rows: dp.rows, fill: dp.fill, arrows: arrows,
+               minSeg: dp.minSeg, maxSeg: dp.maxSeg, minBends: dp.minBends, maxBends: dp.maxBends,
+               nminMin: dp.nminMin, nminMax: dp.nminMax, timeout: dp.timeout,
+               color: dp.color || settings.color, dots: dp.dots || settings.dots };
+    }
+    const p = DIFFICULTY_PRESETS[settings.difficulty];
+    return { cols: p.grid, rows: p.grid, fill: p.fill, arrows: p.arrows,
+             minSeg: p.minSeg, maxSeg: p.maxSeg, minBends: 0, maxBends: p.bends === 'simple' ? 2 : 4,
+             nminMin: p.nminMin, nminMax: p.nminMax, timeout: p.timeout,
+             color: settings.color, dots: settings.dots };
+  }
+
+  let ep = getEffectiveParams();
+  let N = ep.arrows;
+  let COLS = ep.cols, ROWS = ep.rows;
   const DX = [0, 1, 0, -1];
   const DY = [-1, 0, 1, 0];
   const canvas = document.getElementById('c');
@@ -234,7 +281,7 @@
   let level = 1, errors = 0, hints = 0, lastCoverage = 100;
   let hintTimer = null;
   let devMode = false;
-  let devParams = { cols: 15, rows: 15, arrows: 35, minSeg: 1, maxSeg: 5, maxBends: 4, maxAttempts: 200 };
+  let devParams = { cols: 15, rows: 15, fill: 'normal', arrows: 35, minSeg: 1, maxSeg: 5, minBends: 0, maxBends: 4, nminMin: 2, nminMax: 4, timeout: 5, color: '', dots: '' };
   let lastWinW = 0, lastWinH = 0;
   let isLayingOut = false;
   let genTimerInterval = null, genStartTime = 0;
@@ -259,6 +306,8 @@
   function gy(row) { return originY + row * spacing; }
 
   function drawDots() {
+    const ep = getEffectiveParams();
+    if (ep.dots === 'hide') return;
     const r = Math.max(2, spacing * 0.04);
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     for (let row = 0; row < ROWS; row++) {
@@ -308,12 +357,11 @@
           case 3: maxSteps = col; break;
         }
         if (maxSteps < 1) { valid = false; break; }
-        const minSteps = devMode ? devParams.minSeg : Math.max(oMinSeg, seg >= 2 ? segLens[seg - 2] + 1 : 1);
+        const minSteps = Math.max(oMinSeg, seg >= 2 ? segLens[seg - 2] + 1 : 1);
         if (minSteps > maxSteps) { valid = false; break; }
-        const maxSeg = Math.min(maxSteps, devMode ? devParams.maxSeg : oMaxSeg);
+        const maxSeg = Math.min(maxSteps, oMaxSeg);
         if (minSteps > maxSeg) { valid = false; break; }
-        const steps = devMode ? randInt(minSteps, maxSeg)
-          : (Math.random() < 0.6 ? randInt(minSteps, Math.min(maxSeg, Math.max(minSteps, 2))) : randInt(minSteps, maxSeg));
+        const steps = Math.random() < 0.6 ? randInt(minSteps, Math.min(maxSeg, Math.max(minSteps, 2))) : randInt(minSteps, maxSeg);
         segLens.push(steps);
 
         for (let s = 1; s <= steps; s++) {
@@ -525,7 +573,9 @@
   }
 
   async function placeArrowsFull() {
-    console.log('placeArrowsFull: generating full coverage for ' + COLS + 'x' + ROWS + ' grid');
+    const ep = getEffectiveParams();
+    const timeoutMs = ep.timeout * 1000;
+    console.log('placeArrowsFull: generating full coverage for ' + COLS + 'x' + ROWS + ' grid (timeout=' + ep.timeout + 's)');
     const totalDots = COLS * ROWS;
     const maxAttempts = 300;
     const startTime = Date.now();
@@ -534,7 +584,7 @@
 
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
       if (puzzleAttempt % 5 === 0) await new Promise(r => setTimeout(r, 0));
-      if (Date.now() - startTime > 5000) {
+      if (Date.now() - startTime > timeoutMs) {
         console.warn('placeArrowsFull: 5s timeout after ' + puzzleAttempt + ' attempts');
         break;
       }
@@ -628,7 +678,9 @@
   }
 
   async function placeArrowsNormal() {
-    const maxAttempts = devMode ? devParams.maxAttempts : 200;
+    const ep = getEffectiveParams();
+    const segOpts = { minSeg: ep.minSeg, maxSeg: ep.maxSeg };
+    const maxAttempts = 200;
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
       if (puzzleAttempt % 10 === 0) await new Promise(r => setTimeout(r, 0));
       const occupied = new Set();
@@ -638,8 +690,8 @@
       for (let n = 0; n < N; n++) {
         let placed = false;
         for (let retry = 0; retry < 50; retry++) {
-          const bends = devMode ? randInt(0, devParams.maxBends) : randBends();
-          const candidate = generateArrow(bends, occupied);
+          const bends = randBends();
+          const candidate = generateArrow(bends, occupied, segOpts);
           if (!candidate) continue;
           let conflict = false;
           for (const existing of generated) {
@@ -674,8 +726,9 @@
   }
 
   async function placeArrows() {
-    console.log('placeArrows: COLS=' + COLS + ' ROWS=' + ROWS + ' fill=' + settings.fill + ' devMode=' + devMode);
-    if (!devMode && settings.fill === 'full') await placeArrowsFull();
+    const ep = getEffectiveParams();
+    console.log('placeArrows: COLS=' + COLS + ' ROWS=' + ROWS + ' fill=' + ep.fill + ' devMode=' + devMode);
+    if (ep.fill === 'full') await placeArrowsFull();
     else await placeArrowsNormal();
     const _cov = new Set();
     for (const a of arrows) for (const p of a.path) _cov.add(`${p.c},${p.r}`);
@@ -794,8 +847,8 @@
       let dist;
       switch (dir) {
         case 0: dist = p.r * spacing; break;
-        case 1: dist = (GRID - 1 - p.c) * spacing; break;
-        case 2: dist = (GRID - 1 - p.r) * spacing; break;
+        case 1: dist = (COLS - 1 - p.c) * spacing; break;
+        case 2: dist = (ROWS - 1 - p.r) * spacing; break;
         case 3: dist = p.c * spacing; break;
       }
       maxDist = Math.max(maxDist, dist);
@@ -1125,15 +1178,15 @@
 
   const PALETTE = ['#e05555', '#e08030', '#8855cc', '#6688cc'];
   function arrowColor(idx) {
-    if (settings.color === 'bw') return '#ffffff';
-    if (settings.color === 'mono') return '#e94560';
+    const ep = getEffectiveParams();
+    if (ep.color === 'bw') return '#ffffff';
+    if (ep.color === 'mono') return '#e94560';
     return PALETTE[idx % PALETTE.length];
   }
 
   function randBends() {
-    if (settings.bends === 'straight') return 0;
-    if (settings.bends === 'simple') return randInt(0, 2);
-    return Math.random() < 0.7 ? randInt(0, 1) : randInt(2, 4);
+    const ep = getEffectiveParams();
+    return randInt(ep.minBends, ep.maxBends);
   }
 
   function toggleSettings() {
@@ -1142,7 +1195,7 @@
       p.style.display = 'none';
       return;
     }
-    ['grid', 'arrows', 'bends', 'color', 'fill'].forEach(name => {
+    ['difficulty', 'color', 'dots'].forEach(name => {
       const el = p.querySelector(`input[name=${name}][value="${settings[name]}"]`);
       if (el) el.checked = true;
     });
@@ -1192,24 +1245,23 @@
     errors = 0;
     hints = 0;
     cleared = false;
-    N = settings.arrows;
+    const ep = getEffectiveParams();
+    N = ep.arrows;
     resetCam();
     generateWithTimer();
   }
 
   function applySettings() {
-    settings.grid = parseInt(document.querySelector('input[name=grid]:checked').value);
-    settings.arrows = parseInt(document.querySelector('input[name=arrows]:checked').value);
-    settings.bends = document.querySelector('input[name=bends]:checked').value;
+    settings.difficulty = document.querySelector('input[name=difficulty]:checked').value;
     settings.color = document.querySelector('input[name=color]:checked').value;
-    const fillEl = document.querySelector('input[name=fill]:checked');
-    settings.fill = fillEl ? fillEl.value : 'normal';
+    settings.dots = document.querySelector('input[name=dots]:checked').value;
     localStorage.setItem('arrowPuzzleSettings', JSON.stringify(settings));
-    N = settings.arrows;
-    GRID = settings.grid;
-    COLS = GRID; ROWS = GRID;
+    const ep = getEffectiveParams();
+    N = ep.arrows;
+    COLS = ep.cols; ROWS = ep.rows;
     devMode = false;
     document.getElementById('dev-wm').style.display = 'none';
+    document.getElementById('dev-sidebar').style.display = 'none';
     document.getElementById('panel').style.display = 'none';
     document.getElementById('clear-screen').style.display = 'none';
     if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
@@ -1244,39 +1296,95 @@
     setTimeout(hideDevPw, 100);
   });
 
+  function devRestoreFromSettings() {
+    const p = DIFFICULTY_PRESETS[settings.difficulty];
+    document.getElementById('dp-cols').value = p.grid;
+    document.getElementById('dp-rows').value = p.grid;
+    document.getElementById('dp-minseg').value = p.minSeg;
+    document.getElementById('dp-maxseg').value = p.maxSeg;
+    document.getElementById('dp-minbends').value = 0;
+    document.getElementById('dp-maxbends').value = p.bends === 'simple' ? 2 : 4;
+    document.getElementById('dp-fill').value = p.fill;
+    document.getElementById('dp-nmin-min').value = p.nminMin;
+    document.getElementById('dp-nmin-max').value = p.nminMax;
+    document.getElementById('dp-timeout').value = p.timeout;
+    document.getElementById('dp-color').value = '';
+    document.getElementById('dp-dots').value = '';
+  }
+
   function openDevPanel() {
-    document.getElementById('dp-cols').value = COLS;
-    document.getElementById('dp-rows').value = ROWS;
-    document.getElementById('dp-arrows').value = N;
+    const preserved = JSON.parse(localStorage.getItem('arrowPuzzleDevParams') || 'null');
+    if (preserved) {
+      Object.assign(devParams, preserved);
+      document.getElementById('dp-preserve').checked = true;
+    }
+    document.getElementById('dp-cols').value = devParams.cols;
+    document.getElementById('dp-rows').value = devParams.rows;
     document.getElementById('dp-minseg').value = devParams.minSeg;
     document.getElementById('dp-maxseg').value = devParams.maxSeg;
-    document.getElementById('dp-bends').value = devParams.maxBends;
-    document.getElementById('dp-attempts').value = devParams.maxAttempts;
+    document.getElementById('dp-minbends').value = devParams.minBends;
+    document.getElementById('dp-maxbends').value = devParams.maxBends;
+    document.getElementById('dp-fill').value = devParams.fill;
+    document.getElementById('dp-nmin-min').value = devParams.nminMin;
+    document.getElementById('dp-nmin-max').value = devParams.nminMax;
+    document.getElementById('dp-timeout').value = devParams.timeout;
+    document.getElementById('dp-color').value = devParams.color;
+    document.getElementById('dp-dots').value = devParams.dots;
     document.getElementById('devpanel').style.display = 'flex';
   }
 
   function readDevInputs() {
     devParams.cols = parseInt(document.getElementById('dp-cols').value) || 15;
     devParams.rows = parseInt(document.getElementById('dp-rows').value) || 15;
-    devParams.arrows = parseInt(document.getElementById('dp-arrows').value) || 35;
     devParams.minSeg = parseInt(document.getElementById('dp-minseg').value) || 1;
     devParams.maxSeg = parseInt(document.getElementById('dp-maxseg').value) || 5;
-    devParams.maxBends = parseInt(document.getElementById('dp-bends').value) || 4;
-    devParams.maxAttempts = parseInt(document.getElementById('dp-attempts').value) || 200;
+    devParams.minBends = parseInt(document.getElementById('dp-minbends').value) || 0;
+    devParams.maxBends = parseInt(document.getElementById('dp-maxbends').value) || 4;
+    devParams.fill = document.getElementById('dp-fill').value;
+    devParams.nminMin = parseInt(document.getElementById('dp-nmin-min').value) || 0;
+    devParams.nminMax = parseInt(document.getElementById('dp-nmin-max').value) || 4;
+    devParams.timeout = parseInt(document.getElementById('dp-timeout').value) || 5;
+    devParams.color = document.getElementById('dp-color').value;
+    devParams.dots = document.getElementById('dp-dots').value;
+    if (document.getElementById('dp-preserve').checked) {
+      localStorage.setItem('arrowPuzzleDevParams', JSON.stringify(devParams));
+    } else {
+      localStorage.removeItem('arrowPuzzleDevParams');
+    }
   }
 
   function closeDevPanel() {
     document.getElementById('devpanel').style.display = 'none';
   }
 
+  function updateDevSidebar() {
+    const sb = document.getElementById('dev-sidebar');
+    if (!devMode) { sb.style.display = 'none'; return; }
+    const ep = getEffectiveParams();
+    sb.style.display = '';
+    sb.innerHTML =
+      '<b style="color:#e94560">DEV</b><br>' +
+      'cols: ' + ep.cols + '<br>' +
+      'rows: ' + ep.rows + '<br>' +
+      'fill: ' + ep.fill + '<br>' +
+      'Nmin: ' + ep.nminMin + '-' + ep.nminMax + '<br>' +
+      'bends: ' + ep.minBends + '-' + ep.maxBends + '<br>' +
+      'seg: ' + ep.minSeg + '-' + ep.maxSeg + '<br>' +
+      'color: ' + (ep.color || settings.color) + '<br>' +
+      'dots: ' + (ep.dots || settings.dots) + '<br>' +
+      'timeout: ' + ep.timeout + 's';
+  }
+
   function devApply() {
     readDevInputs();
     devMode = true;
-    COLS = devParams.cols;
-    ROWS = devParams.rows;
-    N = devParams.arrows;
+    const ep = getEffectiveParams();
+    COLS = ep.cols;
+    ROWS = ep.rows;
+    N = ep.arrows;
     document.getElementById('dev-wm').style.display = 'block';
     document.getElementById('devpanel').style.display = 'none';
+    updateDevSidebar();
 
     document.getElementById('clear-screen').style.display = 'none';
     if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
@@ -1291,11 +1399,13 @@
   async function devTimeIt() {
     readDevInputs();
     devMode = true;
-    COLS = devParams.cols;
-    ROWS = devParams.rows;
-    N = devParams.arrows;
+    const ep = getEffectiveParams();
+    COLS = ep.cols;
+    ROWS = ep.rows;
+    N = ep.arrows;
     document.getElementById('devpanel').style.display = 'none';
     document.getElementById('dev-wm').style.display = 'block';
+    updateDevSidebar();
 
     document.getElementById('clear-screen').style.display = 'none';
     if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
@@ -1354,6 +1464,15 @@
   }
 
   function init() {
+    const preserved = JSON.parse(localStorage.getItem('arrowPuzzleDevParams') || 'null');
+    if (preserved) {
+      Object.assign(devParams, preserved);
+      devMode = true;
+      const ep = getEffectiveParams();
+      COLS = ep.cols; ROWS = ep.rows; N = ep.arrows;
+      document.getElementById('dev-wm').style.display = 'block';
+      updateDevSidebar();
+    }
     layout();
   }
 
