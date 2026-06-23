@@ -29,13 +29,6 @@
     -webkit-tap-highlight-color: transparent;
   }
   .hdr-btn:hover { background: rgba(255,255,255,0.3); }
-  #gear {
-    width: 30px; height: 30px;
-    background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
-    color: #fff; font-size: 16px; cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-  #gear:hover { background: rgba(255,255,255,0.3); }
   #clear-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(26,26,46,0.92);
@@ -50,30 +43,6 @@
     color: #fff; font-size: 18px; padding: 12px 32px; cursor: pointer;
   }
   .cs button:hover { background: #d63850; }
-  #panel {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.7);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 20;
-  }
-  .pi {
-    background: #1a1a2e; border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 12px; padding: 24px; color: #fff;
-    font-family: sans-serif; min-width: 260px; max-height: 90vh; overflow-y: auto;
-  }
-  .pi h2 { margin-bottom: 12px; font-size: 18px; }
-  .pi .gl { display: block; margin-top: 14px; margin-bottom: 4px; font-size: 12px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; }
-  .pi label { display: block; padding: 3px 0; font-size: 14px; cursor: pointer; }
-  .pi input[type=radio] { margin-right: 6px; }
-  .pi .btns { display: flex; gap: 10px; margin-top: 20px; }
-  .pi button {
-    flex: 1; padding: 10px; border: none; border-radius: 8px;
-    color: #fff; font-size: 15px; cursor: pointer;
-  }
-  .pi .apply { background: #e94560; }
-  .pi .apply:hover { background: #d63850; }
-  .pi .cancel { background: rgba(255,255,255,0.15); }
-  .pi .cancel:hover { background: rgba(255,255,255,0.25); }
   #devpanel {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.85);
@@ -124,9 +93,7 @@
   <button class="hdr-btn" onclick="showDevPw()" style="font-size:10px;padding:3px 6px;opacity:0.5">DEV</button>
   <span id="err">Errors: 0</span>
   <div id="hdr-r">
-    <button class="hdr-btn" onclick="resetCam();render()">&#8634;</button>
     <button id="hint-btn" class="hdr-btn" onclick="useHint()">Hint</button>
-    <button id="gear" onclick="openSettings()">&#9881;</button>
   </div>
 </div>
 <div id="clear-screen" style="display:none">
@@ -155,42 +122,10 @@
     </div>
   </div>
 </div>
-<div id="panel" style="display:none">
-  <div class="pi">
-    <h2>Settings</h2>
-    <span class="gl">Grid Size</span>
-    <label><input type="radio" name="grid" value="12"> Small (12&times;12)</label>
-    <label><input type="radio" name="grid" value="15"> Medium (15&times;15)</label>
-    <label><input type="radio" name="grid" value="20"> Large (20&times;20)</label>
-    <label><input type="radio" name="grid" value="25"> XL (25&times;25)</label>
-    <label><input type="radio" name="grid" value="30"> XXL (30&times;30)</label>
-    <span class="gl">Arrow Count</span>
-    <label><input type="radio" name="arrows" value="15"> Light (15)</label>
-    <label><input type="radio" name="arrows" value="35"> Medium (35)</label>
-    <label><input type="radio" name="arrows" value="55"> Dense (55)</label>
-    <span class="gl">Fill</span>
-    <label><input type="radio" name="fill" value="normal"> Normal</label>
-    <label><input type="radio" name="fill" value="full"> 100% Coverage</label>
-    <span class="gl">Max Bends</span>
-    <label><input type="radio" name="bends" value="straight"> Straight (0)</label>
-    <label><input type="radio" name="bends" value="simple"> Simple (1-2)</label>
-    <label><input type="radio" name="bends" value="complex"> Complex (2-4)</label>
-    <span class="gl">Color</span>
-    <label><input type="radio" name="color" value="multi"> Multicolor</label>
-    <label><input type="radio" name="color" value="mono"> Monochrome</label>
-    <label><input type="radio" name="color" value="bw"> Black &amp; White</label>
-    <div class="btns">
-      <button class="cancel" onclick="document.getElementById('panel').style.display='none'">Cancel</button>
-      <button class="apply" onclick="applySettings()">Apply</button>
-    </div>
-  </div>
-</div>
 <script>
   // Grid size counts dots, not gaps (e.g. 15 means 15 dots across with 14 gaps between them)
-  const DEFAULTS = { grid: 15, arrows: 35, bends: 'complex', color: 'mono', fill: 'normal' };
-  let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('arrowPuzzleSettings') || '{}'));
-  let N = settings.arrows;
-  let GRID = settings.grid;
+  let N = 35;
+  let GRID = 12;
   let COLS = GRID, ROWS = GRID;
   const DX = [0, 1, 0, -1];
   const DY = [-1, 0, 1, 0];
@@ -501,8 +436,8 @@
       const all = [];
       const log = puzzleAttempt < 3;
 
-      // Phase 1: Complex arrows (3-4 bends, 3-6 dot segments) → ~40%
-      fillPhaseConstrained(Math.floor(totalDots * 0.40), occupied, all, 3, 4, { minSeg: 3, maxSeg: 6 }, 2);
+      // Phase 1: Complex arrows (1-2 bends, 3-6 dot segments) → ~40%
+      fillPhaseConstrained(Math.floor(totalDots * 0.40), occupied, all, 1, 2, { minSeg: 3, maxSeg: 6 }, 2);
       const nmin1 = countFree(all);
       if (log) console.log('  #' + puzzleAttempt + ' P1 complex: ' + all.length + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), Nmin=' + nmin1);
 
@@ -621,8 +556,8 @@
   }
 
   function placeArrows() {
-    console.log('placeArrows: COLS=' + COLS + ' ROWS=' + ROWS + ' fill=' + settings.fill + ' devMode=' + devMode);
-    if (!devMode && settings.fill === 'full') placeArrowsFull();
+    console.log('placeArrows: COLS=' + COLS + ' ROWS=' + ROWS + ' devMode=' + devMode);
+    if (!devMode) placeArrowsFull();
     else placeArrowsNormal();
     const _cov = new Set();
     for (const a of arrows) for (const p of a.path) _cov.add(`${p.c},${p.r}`);
@@ -1072,24 +1007,11 @@
 
   const PALETTE = ['#e05555', '#e08030', '#8855cc', '#6688cc'];
   function arrowColor(idx) {
-    if (settings.color === 'bw') return '#ffffff';
-    if (settings.color === 'mono') return '#e94560';
     return PALETTE[idx % PALETTE.length];
   }
 
   function randBends() {
-    if (settings.bends === 'straight') return 0;
-    if (settings.bends === 'simple') return randInt(0, 2);
-    return Math.random() < 0.7 ? randInt(0, 1) : randInt(2, 4);
-  }
-
-  function openSettings() {
-    const p = document.getElementById('panel');
-    ['grid', 'arrows', 'bends', 'color', 'fill'].forEach(name => {
-      const el = p.querySelector(`input[name=${name}][value="${settings[name]}"]`);
-      if (el) el.checked = true;
-    });
-    p.style.display = 'flex';
+    return randInt(0, 2);
   }
 
   function updateUI() {
@@ -1132,32 +1054,7 @@
     errors = 0;
     hints = 0;
     cleared = false;
-    N = settings.arrows;
-    resetCam();
-    placeArrows();
-    updateUI();
-    render();
-  }
-
-  function applySettings() {
-    settings.grid = parseInt(document.querySelector('input[name=grid]:checked').value);
-    settings.arrows = parseInt(document.querySelector('input[name=arrows]:checked').value);
-    settings.bends = document.querySelector('input[name=bends]:checked').value;
-    settings.color = document.querySelector('input[name=color]:checked').value;
-    const fillEl = document.querySelector('input[name=fill]:checked');
-    settings.fill = fillEl ? fillEl.value : 'normal';
-    localStorage.setItem('arrowPuzzleSettings', JSON.stringify(settings));
-    N = settings.arrows;
-    GRID = settings.grid;
-    COLS = GRID; ROWS = GRID;
-    devMode = false;
-    document.getElementById('dev-wm').style.display = 'none';
-    document.getElementById('panel').style.display = 'none';
-    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
-    document.getElementById('clear-screen').style.display = 'none';
-    if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; } anims.clear();
-    errors = 0; hints = 0; cleared = false;
-    layout();
+    N = 35;
     resetCam();
     placeArrows();
     updateUI();
