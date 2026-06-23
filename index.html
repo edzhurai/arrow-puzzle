@@ -152,7 +152,7 @@
   <div id="hdr-r">
     <button class="hdr-btn" onclick="resetCam();render()">&#8634;</button>
     <button id="hint-btn" class="hdr-btn" onclick="useHint()">Hint</button>
-    <button id="gear" onclick="openSettings()">&#9881;</button>
+    <button id="gear" onclick="toggleSettings()">&#9881;</button>
   </div>
 </div>
 <div id="clear-screen" style="display:none">
@@ -190,7 +190,6 @@
     <label><input type="radio" name="color" value="mono"> Monochrome</label>
     <label><input type="radio" name="color" value="bw"> Black &amp; White</label>
     <div class="btns">
-      <button class="cancel" onclick="document.getElementById('panel').style.display='none'">Cancel</button>
       <button class="apply" onclick="applySettings()">Apply</button>
     </div>
   </div>
@@ -1133,8 +1132,12 @@
     return Math.random() < 0.7 ? randInt(0, 1) : randInt(2, 4);
   }
 
-  function openSettings() {
+  function toggleSettings() {
     const p = document.getElementById('panel');
+    if (p.style.display === 'flex') {
+      p.style.display = 'none';
+      return;
+    }
     ['grid', 'arrows', 'bends', 'color', 'fill'].forEach(name => {
       const el = p.querySelector(`input[name=${name}][value="${settings[name]}"]`);
       if (el) el.checked = true;
@@ -1311,11 +1314,11 @@
   function startGenTimer() {
     genStartTime = Date.now();
     const el = document.getElementById('gen-timer');
-    el.textContent = '0s';
+    el.textContent = '0.0s';
     if (genTimerInterval) clearInterval(genTimerInterval);
     genTimerInterval = setInterval(() => {
-      el.textContent = Math.floor((Date.now() - genStartTime) / 1000) + 's';
-    }, 200);
+      el.textContent = ((Date.now() - genStartTime) / 1000).toFixed(1) + 's';
+    }, 100);
   }
 
   function stopGenTimer() {
