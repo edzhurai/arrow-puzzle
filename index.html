@@ -182,7 +182,7 @@
     <div class="cs-lvl">Level 1</div>
     <div class="cs-err">0 Errors</div>
     <div class="cs-cov" style="font-size:16px;color:rgba(255,255,255,0.5);margin-bottom:20px"></div>
-    <button onclick="this.classList.add('btn-active');setTimeout(nextLevel,400)">Next Level</button>
+    <button onclick="this.classList.add('btn-active');setTimeout(nextLevel,400)">Play Again!</button>
   </div>
 </div>
 <div id="dev-pw" style="display:none"><input type="password" id="dev-pw-input" placeholder="password"></div>
@@ -243,7 +243,7 @@
     easy:   { grid: 10, fill: 'normal', arrows: 15, bends: 'simple',  nminMin: 8,  nminMax: 12, minSeg: 2, maxSeg: 4, timeout: 5 },
     medium: { grid: 15, fill: 'normal', arrows: 35, bends: 'complex', nminMin: 4,  nminMax: 7,  minSeg: 1, maxSeg: 5, timeout: 5 },
     hard:   { grid: 20, fill: 'full',   arrows: 55, bends: 'complex', nminMin: 2,  nminMax: 4,  minSeg: 1, maxSeg: 5, timeout: 5 },
-    expert: { grid: 25, fill: 'full',   arrows: 80, bends: 'complex', nminMin: 1,  nminMax: 2,  minSeg: 1, maxSeg: 5, timeout: 8 },
+    expert: { grid: 25, fill: 'full',   arrows: 80, bends: 'complex', nminMin: 1,  nminMax: 2,  minSeg: 1, maxSeg: 5, timeout: 20 },
   };
   const DEFAULTS = { difficulty: 'medium', color: 'mono' };
   const saved = localStorage.getItem('arrowPuzzleSettings');
@@ -1212,7 +1212,7 @@
   }
 
   function updateUI() {
-    document.getElementById('lvl').textContent = difficultyLabel() + ' L' + level;
+    document.getElementById('lvl').textContent = difficultyLabel();
     document.getElementById('err').textContent = 'Err: ' + errors;
   }
 
@@ -1238,7 +1238,7 @@
 
   function showClearScreen() {
     const cs = document.getElementById('clear-screen');
-    cs.querySelector('.cs-lvl').textContent = difficultyLabel() + ' L' + level;
+    cs.querySelector('.cs-lvl').textContent = difficultyLabel();
     cs.querySelector('.cs-err').textContent = errors + ' Error' + (errors !== 1 ? 's' : '');
     const covEl = cs.querySelector('.cs-cov');
     const _cov = new Set();
@@ -1452,8 +1452,11 @@
 
   function stopGenTimer() {
     if (genTimerInterval) { clearInterval(genTimerInterval); genTimerInterval = null; }
-    const elapsed = ((Date.now() - genStartTime) / 1000).toFixed(1);
-    document.getElementById('gen-timer').textContent = elapsed + 's';
+    const _cov = new Set();
+    for (const a of arrows) for (const p of a.path) _cov.add(`${p.c},${p.r}`);
+    const covPct = Math.round(_cov.size / (COLS * ROWS) * 100);
+    const nmin = countFree(arrows);
+    document.getElementById('gen-timer').textContent = covPct + '% · ' + nmin + '↗';
   }
 
   function generateWithTimer() {
