@@ -346,26 +346,20 @@
   }
 
   function tryExtendArrow(arrow, dot, allArrows, occupied) {
-    const dc = dot.c, dr = dot.r;
     const tail = arrow.path[0];
-    const second = arrow.path[1];
-    const tailDirC = tail.c - second.c;
-    const tailDirR = tail.r - second.r;
-    if (dc === tail.c + tailDirC && dr === tail.r + tailDirR) {
-      const newPath = [{ c: dc, r: dr }, ...arrow.path];
-      const last = newPath[newPath.length - 1];
-      const prev = newPath[newPath.length - 2];
-      const hdc = Math.sign(last.c - prev.c);
-      const hdr = Math.sign(last.r - prev.r);
-      const headProj = hdc * last.c + hdr * last.r;
-      for (const p of newPath) {
-        if (hdc * p.c + hdr * p.r > headProj) return false;
-      }
-      arrow.path = newPath;
-      occupied.add(`${dc},${dr}`);
-      return true;
+    if (Math.abs(dot.c - tail.c) + Math.abs(dot.r - tail.r) !== 1) return false;
+    const newPath = [{ c: dot.c, r: dot.r }, ...arrow.path];
+    const last = newPath[newPath.length - 1];
+    const prev = newPath[newPath.length - 2];
+    const hdc = Math.sign(last.c - prev.c);
+    const hdr = Math.sign(last.r - prev.r);
+    const headProj = hdc * last.c + hdr * last.r;
+    for (const p of newPath) {
+      if (hdc * p.c + hdr * p.r > headProj) return false;
     }
-    return false;
+    arrow.path = newPath;
+    occupied.add(`${dot.c},${dot.r}`);
+    return true;
   }
 
   function countFree(list) {
@@ -477,23 +471,29 @@
         for (const a of all) for (const p of a.path) occupied.add(`${p.c},${p.r}`);
       }
 
-      // Phase 6: Extensions for orphans
-      const orphans = [];
+      // Phase 6: Aggressive tail extensions — multiple passes until no progress
+      let extended = 0;
+      let progress = true;
+      while (progress && occupied.size < totalDots) {
+        progress = false;
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (occupied.has(`${c},${r}`)) continue;
+            const dot = { c, r };
+            for (const a of all) {
+              if (tryExtendArrow(a, dot, all, occupied)) { extended++; progress = true; break; }
+            }
+          }
+        }
+      }
+      const unfilled = [];
       for (let r = 0; r < ROWS; r++)
         for (let c = 0; c < COLS; c++)
-          if (!occupied.has(`${c},${r}`)) orphans.push({ c, r });
-      let extended = 0;
-      const unfilled = [];
-      for (const dot of orphans) {
-        let filled = false;
-        for (const a of all) {
-          if (tryExtendArrow(a, dot, all, occupied)) { extended++; filled = true; break; }
-        }
-        if (!filled) unfilled.push(dot);
-      }
+          if (!occupied.has(`${c},${r}`)) unfilled.push(`${c},${r}`);
       const finalNmin = countFree(all);
       if (log) {
         console.log('  #' + puzzleAttempt + ' P5+6 cleanup: +' + extended + ' ext, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), unfilled=' + unfilled.length + ', finalNmin=' + finalNmin);
+        if (unfilled.length > 0) console.log('    unfilled dots: ' + unfilled.join(' '));
       }
 
       if (occupied.size < totalDots) { stats.coverageFail++; continue; }
