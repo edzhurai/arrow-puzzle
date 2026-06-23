@@ -33,6 +33,7 @@
   .hdr-btn:hover { background: rgba(255,255,255,0.3); }
   .hdr-btn.btn-active { background: rgba(255,255,255,0.5); }
   #gear {
+    position: relative; z-index: 21;
     width: 30px; height: 30px;
     background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
     color: #fff; font-size: 16px; cursor: pointer;
@@ -522,7 +523,7 @@
     console.log(label + ' END: placed=' + dbgPlaced + ' arrows=' + generated.length + ' dots=' + occupied.size + '/' + target + ' rejects: noCandidate=' + dbgNoCandidate + ' conflict=' + dbgConflict + ' nmin=' + dbgNminReject + ' stalls=' + stalls);
   }
 
-  function placeArrowsFull() {
+  async function placeArrowsFull() {
     console.log('placeArrowsFull: generating full coverage for ' + COLS + 'x' + ROWS + ' grid');
     const totalDots = COLS * ROWS;
     const maxAttempts = 300;
@@ -531,6 +532,7 @@
     let best = null, bestCov = 0;
 
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
+      if (puzzleAttempt % 5 === 0) await new Promise(r => setTimeout(r, 0));
       if (Date.now() - startTime > 5000) {
         console.warn('placeArrowsFull: 5s timeout after ' + puzzleAttempt + ' attempts');
         break;
@@ -611,7 +613,7 @@
       if (hasConflict) {
         console.warn('Full coverage fallback rejected: head-on conflict detected, falling back to normal');
         lastCoverage = 100;
-        placeArrowsNormal();
+        await placeArrowsNormal();
         return;
       }
       arrows = best;
@@ -620,13 +622,14 @@
       cleared = false;
     } else {
       lastCoverage = 100;
-      placeArrowsNormal();
+      await placeArrowsNormal();
     }
   }
 
-  function placeArrowsNormal() {
+  async function placeArrowsNormal() {
     const maxAttempts = devMode ? devParams.maxAttempts : 200;
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
+      if (puzzleAttempt % 10 === 0) await new Promise(r => setTimeout(r, 0));
       const occupied = new Set();
       const generated = [];
       let success = true;
@@ -666,13 +669,13 @@
     }
     console.warn('Could not generate puzzle with >= ' + Math.ceil(N / 2) + ' arrows, reducing target');
     N = Math.max(1, Math.ceil(N / 2));
-    placeArrowsNormal();
+    await placeArrowsNormal();
   }
 
-  function placeArrows() {
+  async function placeArrows() {
     console.log('placeArrows: COLS=' + COLS + ' ROWS=' + ROWS + ' fill=' + settings.fill + ' devMode=' + devMode);
-    if (!devMode && settings.fill === 'full') placeArrowsFull();
-    else placeArrowsNormal();
+    if (!devMode && settings.fill === 'full') await placeArrowsFull();
+    else await placeArrowsNormal();
     const _cov = new Set();
     for (const a of arrows) for (const p of a.path) _cov.add(`${p.c},${p.r}`);
     console.log('Generated: ' + arrows.length + ' arrows, ' + _cov.size + '/' + (COLS * ROWS) + ' dots (' + (_cov.size / (COLS * ROWS) * 100).toFixed(1) + '%), Nmin=' + countFree(arrows));
@@ -1284,7 +1287,7 @@
 
   function devGenerate() { devApply(); }
 
-  function devTimeIt() {
+  async function devTimeIt() {
     readDevInputs();
     devMode = true;
     COLS = devParams.cols;
@@ -1299,7 +1302,7 @@
     const times = [];
     for (let run = 0; run < 10; run++) {
       const t0 = performance.now();
-      placeArrows();
+      await placeArrows();
       times.push(performance.now() - t0);
     }
     times.sort((a, b) => a - b);
@@ -1331,8 +1334,8 @@
     document.getElementById('hdr').style.display = '';
     startGenTimer();
     updateUI();
-    setTimeout(() => {
-      placeArrows();
+    setTimeout(async () => {
+      await placeArrows();
       stopGenTimer();
       render();
     }, 50);
