@@ -159,7 +159,7 @@
   <div class="pi">
     <h2>Settings</h2>
     <span class="gl">Grid Size</span>
-    <label><input type="radio" name="grid" value="10"> Small (10&times;10)</label>
+    <label><input type="radio" name="grid" value="12"> Small (12&times;12)</label>
     <label><input type="radio" name="grid" value="15"> Medium (15&times;15)</label>
     <label><input type="radio" name="grid" value="20"> Large (20&times;20)</label>
     <label><input type="radio" name="grid" value="25"> XL (25&times;25)</label>
@@ -187,7 +187,7 @@
 </div>
 <script>
   // Grid size counts dots, not gaps (e.g. 15 means 15 dots across with 14 gaps between them)
-  const DEFAULTS = { grid: 12, arrows: 35, bends: 'complex', color: 'mono', fill: 'normal' };
+  const DEFAULTS = { grid: 15, arrows: 35, bends: 'complex', color: 'mono', fill: 'normal' };
   let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('arrowPuzzleSettings') || '{}'));
   let N = settings.arrows;
   let GRID = settings.grid;
@@ -510,6 +510,7 @@
   }
 
   function placeArrows() {
+    console.log('placeArrows: COLS=' + COLS + ' ROWS=' + ROWS + ' fill=' + settings.fill + ' devMode=' + devMode);
     if (!devMode && settings.fill === 'full') placeArrowsFull();
     else placeArrowsNormal();
   }
@@ -1028,7 +1029,8 @@
     settings.arrows = parseInt(document.querySelector('input[name=arrows]:checked').value);
     settings.bends = document.querySelector('input[name=bends]:checked').value;
     settings.color = document.querySelector('input[name=color]:checked').value;
-    settings.fill = document.querySelector('input[name=fill]:checked').value;
+    const fillEl = document.querySelector('input[name=fill]:checked');
+    settings.fill = fillEl ? fillEl.value : 'normal';
     localStorage.setItem('arrowPuzzleSettings', JSON.stringify(settings));
     N = settings.arrows;
     GRID = settings.grid;
