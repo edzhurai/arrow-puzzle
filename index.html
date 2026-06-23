@@ -412,6 +412,7 @@
     const totalDots = COLS * ROWS;
     const targetPhase1 = Math.floor(totalDots * 0.85);
     const maxAttempts = 500;
+    let stats = { coverageFail: 0, conflictFail: 0, solveFail: 0 };
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
       const occupied = new Set();
       const generated = [];
@@ -436,6 +437,10 @@
         if (!placed) break;
       }
 
+      if (puzzleAttempt < 3) {
+        console.log('  attempt ' + puzzleAttempt + ' phase1: ' + generated.length + ' arrows, ' + occupied.size + '/' + totalDots + ' dots (' + (occupied.size / totalDots * 100).toFixed(1) + '%)');
+      }
+
       const uncovered = new Set();
       for (let r = 0; r < ROWS; r++)
         for (let c = 0; c < COLS; c++)
@@ -446,22 +451,28 @@
 
       const coveredAfter = new Set();
       for (const a of all) for (const p of a.path) coveredAfter.add(`${p.c},${p.r}`);
-      if (coveredAfter.size < totalDots) continue;
+
+      if (puzzleAttempt < 3) {
+        console.log('  attempt ' + puzzleAttempt + ' phase2: ' + fillers.length + ' fillers, ' + coveredAfter.size + '/' + totalDots + ' dots (' + (coveredAfter.size / totalDots * 100).toFixed(1) + '%), uncovered remaining: ' + (totalDots - coveredAfter.size));
+      }
+
+      if (coveredAfter.size < totalDots) { stats.coverageFail++; continue; }
 
       let hasConflict = false;
       for (let i = 0; i < all.length && !hasConflict; i++)
         for (let j = i + 1; j < all.length && !hasConflict; j++)
           if (headsConflict(all[i], all[j])) hasConflict = true;
-      if (hasConflict) continue;
+      if (hasConflict) { stats.conflictFail++; continue; }
 
-      if (isSolvable(all)) {
-        arrows = all;
-        console.log('Full coverage puzzle generated (' + puzzleAttempt + ' attempts, ' + arrows.length + ' arrows, ' + coveredAfter.size + '/' + totalDots + ' dots)');
-        cleared = false;
-        return;
-      }
+      // Temporarily accept without solvability check to test coverage
+      arrows = all;
+      const solvable = isSolvable(all);
+      console.log('Full coverage puzzle generated (' + puzzleAttempt + ' attempts, ' + arrows.length + ' arrows, ' + coveredAfter.size + '/' + totalDots + ' dots, solvable=' + solvable + ')');
+      if (!solvable) stats.solveFail++;
+      cleared = false;
+      return;
     }
-    console.warn('Full coverage failed, falling back to normal generation');
+    console.warn('Full coverage failed after ' + maxAttempts + ' attempts. coverageFail=' + stats.coverageFail + ' conflictFail=' + stats.conflictFail + ' solveFail=' + stats.solveFail);
     placeArrowsNormal();
   }
 
