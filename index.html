@@ -248,12 +248,14 @@
     return 3;
   }
 
-  function generateArrow(numBends, occupied) {
+  function generateArrow(numBends, occupied, opts) {
+    const oMinSeg = (opts && opts.minSeg) || 1;
+    const oMaxSeg = (opts && opts.maxSeg) || 5;
     for (let attempt = 0; attempt < 200; attempt++) {
       const path = [];
       const visited = new Set();
-      let col = randInt(2, COLS - 3);
-      let row = randInt(2, ROWS - 3);
+      let col = randInt(1, COLS - 2);
+      let row = randInt(1, ROWS - 2);
       let dir = randInt(0, 3);
       let valid = true;
 
@@ -272,9 +274,10 @@
           case 3: maxSteps = col; break;
         }
         if (maxSteps < 1) { valid = false; break; }
-        const minSteps = devMode ? devParams.minSeg : (seg >= 2 ? segLens[seg - 2] + 1 : 1);
+        const minSteps = devMode ? devParams.minSeg : Math.max(oMinSeg, seg >= 2 ? segLens[seg - 2] + 1 : 1);
         if (minSteps > maxSteps) { valid = false; break; }
-        const maxSeg = Math.min(maxSteps, devMode ? devParams.maxSeg : 5);
+        const maxSeg = Math.min(maxSteps, devMode ? devParams.maxSeg : oMaxSeg);
+        if (minSteps > maxSeg) { valid = false; break; }
         const steps = devMode ? randInt(minSteps, maxSeg)
           : (Math.random() < 0.6 ? randInt(minSteps, Math.min(maxSeg, Math.max(minSteps, 2))) : randInt(minSteps, maxSeg));
         segLens.push(steps);
@@ -430,78 +433,83 @@
     return false;
   }
 
+  function fillPhase(target, occupied, generated, bendMin, bendMax, opts) {
+    while (occupied.size < target) {
+      let placed = false;
+      for (let retry = 0; retry < 80; retry++) {
+        const bends = randInt(bendMin, bendMax);
+        const candidate = generateArrow(bends, occupied, opts);
+        if (!candidate) continue;
+        let conflict = false;
+        for (const existing of generated) {
+          if (headsConflict(candidate, existing)) { conflict = true; break; }
+        }
+        if (!conflict) {
+          generated.push(candidate);
+          for (const p of candidate.path) occupied.add(`${p.c},${p.r}`);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) break;
+    }
+  }
+
   function placeArrowsFull() {
-    console.log('placeArrowsFull: generating full coverage for ' + COLS + 'x' + ROWS + ' grid (ignoring N=' + N + ')');
+    console.log('placeArrowsFull: generating full coverage for ' + COLS + 'x' + ROWS + ' grid');
     const totalDots = COLS * ROWS;
-    const targetPhase1 = Math.floor(totalDots * 0.85);
     const maxAttempts = 500;
     let stats = { coverageFail: 0, conflictFail: 0, solveFail: 0 };
+
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
       const occupied = new Set();
-      const generated = [];
+      const all = [];
+      const log = puzzleAttempt < 3;
 
-      while (occupied.size < targetPhase1) {
-        let placed = false;
-        for (let retry = 0; retry < 50; retry++) {
-          const bends = randBends();
-          const candidate = generateArrow(bends, occupied);
-          if (!candidate) continue;
-          let conflict = false;
-          for (const existing of generated) {
-            if (headsConflict(candidate, existing)) { conflict = true; break; }
-          }
-          if (!conflict) {
-            generated.push(candidate);
-            for (const p of candidate.path) occupied.add(`${p.c},${p.r}`);
-            placed = true;
-            break;
-          }
-        }
-        if (!placed) break;
-      }
+      // Phase 1: Large arrows (3-4 bends, 4-6 dot segments) → ~40%
+      fillPhase(Math.floor(totalDots * 0.40), occupied, all, 3, 4, { minSeg: 3, maxSeg: 6 });
+      if (log) console.log('  #' + puzzleAttempt + ' P1 large: ' + all.length + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%)');
 
-      if (puzzleAttempt < 3) {
-        console.log('  attempt ' + puzzleAttempt + ' phase1: ' + generated.length + ' arrows, ' + occupied.size + '/' + totalDots + ' dots (' + (occupied.size / totalDots * 100).toFixed(1) + '%)');
-      }
+      // Phase 2: Medium arrows (1-2 bends, 3-4 dot segments) → ~70%
+      const p2Start = all.length;
+      fillPhase(Math.floor(totalDots * 0.70), occupied, all, 1, 2, { minSeg: 2, maxSeg: 4 });
+      if (log) console.log('  #' + puzzleAttempt + ' P2 medium: +' + (all.length - p2Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%)');
 
+      // Phase 3: Small arrows (0-1 bends, 2-3 dot segments) → ~90%
+      const p3Start = all.length;
+      fillPhase(Math.floor(totalDots * 0.90), occupied, all, 0, 1, { minSeg: 1, maxSeg: 3 });
+      if (log) console.log('  #' + puzzleAttempt + ' P3 small: +' + (all.length - p3Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%)');
+
+      // Phase 4: Fillers (minimum 2-dot straight arrows)
       const uncovered = new Set();
       for (let r = 0; r < ROWS; r++)
         for (let c = 0; c < COLS; c++)
           if (!occupied.has(`${c},${r}`)) uncovered.add(`${c},${r}`);
-
+      const p4Start = all.length;
       const fillers = generateFiller(occupied, uncovered);
-      const all = generated.concat(fillers);
-
-      // Rebuild occupied from all arrows
+      for (const f of fillers) all.push(f);
       occupied.clear();
       for (const a of all) for (const p of a.path) occupied.add(`${p.c},${p.r}`);
+      if (log) console.log('  #' + puzzleAttempt + ' P4 fillers: +' + (all.length - p4Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%)');
 
-      // Phase 3: extend adjacent arrows to cover orphaned dots
+      // Phase 5: Extensions (extend tails to cover orphans)
       const orphans = [];
       for (let r = 0; r < ROWS; r++)
         for (let c = 0; c < COLS; c++)
           if (!occupied.has(`${c},${r}`)) orphans.push({ c, r });
-
       let extended = 0;
       const unfilled = [];
       for (const dot of orphans) {
         let filled = false;
         for (const a of all) {
-          if (tryExtendArrow(a, dot, all, occupied)) {
-            extended++;
-            filled = true;
-            break;
-          }
+          if (tryExtendArrow(a, dot, all, occupied)) { extended++; filled = true; break; }
         }
         if (!filled) unfilled.push(dot);
       }
-
-      if (puzzleAttempt < 3) {
-        const covCount = occupied.size;
-        console.log('  attempt ' + puzzleAttempt + ' phase2: ' + fillers.length + ' fillers, phase3: ' + extended + ' extensions, ' + covCount + '/' + totalDots + ' dots (' + (covCount / totalDots * 100).toFixed(1) + '%), unfilled: ' + unfilled.length);
-        if (unfilled.length > 0 && unfilled.length <= 5) {
-          console.log('  unfilled dots:', unfilled.map(d => '(' + d.c + ',' + d.r + ')').join(' '));
-        }
+      if (log) {
+        console.log('  #' + puzzleAttempt + ' P5 extend: +' + extended + ', ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), unfilled: ' + unfilled.length);
+        if (unfilled.length > 0 && unfilled.length <= 10)
+          console.log('    unfilled:', unfilled.map(d => '(' + d.c + ',' + d.r + ')').join(' '));
       }
 
       if (occupied.size < totalDots) { stats.coverageFail++; continue; }
@@ -514,12 +522,12 @@
 
       arrows = all;
       const solvable = isSolvable(all);
-      console.log('Full coverage puzzle generated (' + puzzleAttempt + ' attempts, ' + arrows.length + ' arrows, ' + occupied.size + '/' + totalDots + ' dots, solvable=' + solvable + ')');
+      console.log('Full coverage generated (#' + puzzleAttempt + ', ' + arrows.length + ' arrows, ' + occupied.size + '/' + totalDots + ', solvable=' + solvable + ')');
       if (!solvable) stats.solveFail++;
       cleared = false;
       return;
     }
-    console.warn('Full coverage failed after ' + maxAttempts + ' attempts. coverageFail=' + stats.coverageFail + ' conflictFail=' + stats.conflictFail + ' solveFail=' + stats.solveFail);
+    console.warn('Full coverage failed (' + maxAttempts + ' attempts). coverage=' + stats.coverageFail + ' conflict=' + stats.conflictFail + ' solve=' + stats.solveFail);
     placeArrowsNormal();
   }
 
