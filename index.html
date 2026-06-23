@@ -624,6 +624,9 @@
     console.log('placeArrows: COLS=' + COLS + ' ROWS=' + ROWS + ' fill=' + settings.fill + ' devMode=' + devMode);
     if (!devMode && settings.fill === 'full') placeArrowsFull();
     else placeArrowsNormal();
+    const _cov = new Set();
+    for (const a of arrows) for (const p of a.path) _cov.add(`${p.c},${p.r}`);
+    console.log('Generated: ' + arrows.length + ' arrows, ' + _cov.size + '/' + (COLS * ROWS) + ' dots (' + (_cov.size / (COLS * ROWS) * 100).toFixed(1) + '%), Nmin=' + countFree(arrows));
   }
 
   function drawArrow(a, offX, offY, color, glow) {
