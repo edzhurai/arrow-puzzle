@@ -623,7 +623,7 @@
     }
     console.warn('Could not generate puzzle with >= ' + Math.ceil(N / 2) + ' arrows, reducing target');
     N = Math.max(1, Math.ceil(N / 2));
-    placeArrows();
+    placeArrowsNormal();
   }
 
   function placeArrows() {
