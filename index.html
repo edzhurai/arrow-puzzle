@@ -209,10 +209,13 @@
   let devMode = false;
   let devParams = { cols: 15, rows: 15, arrows: 35, minSeg: 1, maxSeg: 5, maxBends: 4, maxAttempts: 200 };
   let lastWinW = 0, lastWinH = 0;
+  let isLayingOut = false;
 
   function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
 
   function layout() {
+    if (isLayingOut) return;
+    isLayingOut = true;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     lastWinW = canvas.width; lastWinH = canvas.height;
@@ -221,6 +224,7 @@
     spacing = Math.min(usableW / (COLS - 1), usableH / (ROWS - 1));
     originX = (canvas.width - (COLS - 1) * spacing) / 2;
     originY = (canvas.height - (ROWS - 1) * spacing) / 2;
+    isLayingOut = false;
   }
 
   function gx(col) { return originX + col * spacing; }
