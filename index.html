@@ -396,33 +396,39 @@
 
   function fillPhaseConstrained(target, occupied, generated, bendMin, bendMax, opts, minNmin) {
     let stalls = 0;
+    let dbgNoCandidate = 0, dbgConflict = 0, dbgNminReject = 0, dbgPlaced = 0;
+    const label = 'fillPhase(bends=' + bendMin + '-' + bendMax + ' seg=' + (opts&&opts.minSeg||1) + '-' + (opts&&opts.maxSeg||5) + ' target=' + target + ')';
+    console.log(label + ' START: ' + generated.length + ' arrows, ' + occupied.size + ' dots occupied');
     while (occupied.size < target && stalls < 100) {
       let placed = false;
       for (let retry = 0; retry < 80; retry++) {
         const bends = randInt(bendMin, bendMax);
         const candidate = generateArrow(bends, occupied, opts);
-        if (!candidate) continue;
+        if (!candidate) { dbgNoCandidate++; continue; }
         let conflict = false;
         for (const existing of generated) {
           if (headsConflict(candidate, existing)) { conflict = true; break; }
         }
-        if (conflict) continue;
+        if (conflict) { dbgConflict++; continue; }
 
         generated.push(candidate);
         for (const p of candidate.path) occupied.add(`${p.c},${p.r}`);
 
         const nmin = countFree(generated);
         if (generated.length >= 10 && nmin < minNmin) {
+          dbgNminReject++;
           generated.pop();
           for (const p of candidate.path) occupied.delete(`${p.c},${p.r}`);
           continue;
         }
         placed = true;
+        dbgPlaced++;
         break;
       }
       if (!placed) { stalls++; continue; }
       stalls = 0;
     }
+    console.log(label + ' END: placed=' + dbgPlaced + ' arrows=' + generated.length + ' dots=' + occupied.size + '/' + target + ' rejects: noCandidate=' + dbgNoCandidate + ' conflict=' + dbgConflict + ' nmin=' + dbgNminReject + ' stalls=' + stalls);
   }
 
   function placeArrowsFull() {
