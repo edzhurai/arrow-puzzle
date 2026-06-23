@@ -412,7 +412,7 @@
         for (const p of candidate.path) occupied.add(`${p.c},${p.r}`);
 
         const nmin = countFree(generated);
-        if (nmin < minNmin) {
+        if (generated.length >= 10 && nmin < minNmin) {
           generated.pop();
           for (const p of candidate.path) occupied.delete(`${p.c},${p.r}`);
           continue;
