@@ -215,7 +215,7 @@
 <script>
   // Grid size counts dots, not gaps (e.g. 15 means 15 dots across with 14 gaps between them)
   const DEFAULTS = { grid: 15, arrows: 35, bends: 'complex', color: 'mono', fill: 'normal' };
-  let settings = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('arrowPuzzleSettings') || '{}'));
+  let settings = Object.assign({}, DEFAULTS);
   let N = settings.arrows;
   let GRID = settings.grid;
   let COLS = GRID, ROWS = GRID;
