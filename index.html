@@ -174,6 +174,7 @@
   <div id="hdr-r">
     <button class="hdr-btn" onclick="resetCam();render()">&#8634;</button>
     <button id="hint-btn" class="hdr-btn" onclick="useHint()">Hint</button>
+    <button id="dots-btn" class="hdr-btn" onclick="toggleDots()" style="font-size:16px;padding:3px 8px">&#183;</button>
     <button id="gear" onclick="toggleSettings()">&#9881;</button>
   </div>
 </div>
@@ -199,9 +200,6 @@
     <label><input type="radio" name="color" value="multi"> Multicolor</label>
     <label><input type="radio" name="color" value="mono"> Monochrome</label>
     <label><input type="radio" name="color" value="bw"> Black &amp; White</label>
-    <span class="gl">Dots</span>
-    <label><input type="radio" name="dots" value="show"> Show</label>
-    <label><input type="radio" name="dots" value="hide"> Hide</label>
     <button class="how-to-play" onclick="alert('How to Play — coming soon!')">How to Play</button>
     <div class="btns">
       <button class="cancel" onclick="document.getElementById('panel').style.display='none'">Cancel</button>
@@ -240,6 +238,7 @@
   let devMode = false;
   let devParams = { cols: 15, rows: 15, fill: 'normal', arrows: 35, minSeg: 1, maxSeg: 5, minBends: 0, maxBends: 4, nminMin: 2, nminMax: 4, timeout: 5, color: '', dots: '' };
   let isLayingOut = false;
+  let showDots = true;
 
   const DIFFICULTY_PRESETS = {
     easy:   { grid: 10, fill: 'normal', arrows: 15, bends: 'simple',  nminMin: 8,  nminMax: 12, minSeg: 2, maxSeg: 4, timeout: 5 },
@@ -247,7 +246,7 @@
     hard:   { grid: 20, fill: 'full',   arrows: 55, bends: 'complex', nminMin: 2,  nminMax: 4,  minSeg: 1, maxSeg: 5, timeout: 5 },
     expert: { grid: 25, fill: 'full',   arrows: 80, bends: 'complex', nminMin: 1,  nminMax: 2,  minSeg: 1, maxSeg: 5, timeout: 8 },
   };
-  const DEFAULTS = { difficulty: 'medium', color: 'mono', dots: 'show' };
+  const DEFAULTS = { difficulty: 'medium', color: 'mono' };
   const saved = localStorage.getItem('arrowPuzzleSettings');
   let settings = saved ? Object.assign({}, DEFAULTS, JSON.parse(saved)) : Object.assign({}, DEFAULTS);
   if (!DIFFICULTY_PRESETS[settings.difficulty]) settings.difficulty = 'medium';
@@ -259,13 +258,13 @@
       return { cols: dp.cols, rows: dp.rows, fill: dp.fill, arrows: arrows,
                minSeg: dp.minSeg, maxSeg: dp.maxSeg, minBends: dp.minBends, maxBends: dp.maxBends,
                nminMin: dp.nminMin, nminMax: dp.nminMax, timeout: dp.timeout,
-               color: dp.color || settings.color, dots: dp.dots || settings.dots };
+               color: dp.color || settings.color };
     }
     const p = DIFFICULTY_PRESETS[settings.difficulty];
     return { cols: p.grid, rows: p.grid, fill: p.fill, arrows: p.arrows,
              minSeg: p.minSeg, maxSeg: p.maxSeg, minBends: 0, maxBends: p.bends === 'simple' ? 2 : 4,
              nminMin: p.nminMin, nminMax: p.nminMax, timeout: p.timeout,
-             color: settings.color, dots: settings.dots };
+             color: settings.color };
   }
 
   let ep = getEffectiveParams();
@@ -307,8 +306,7 @@
   function gy(row) { return originY + row * spacing; }
 
   function drawDots() {
-    const ep = getEffectiveParams();
-    if (ep.dots === 'hide') return;
+    if (!showDots) return;
     const r = Math.max(2, spacing * 0.04);
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     for (let row = 0; row < ROWS; row++) {
@@ -1196,11 +1194,17 @@
       p.style.display = 'none';
       return;
     }
-    ['difficulty', 'color', 'dots'].forEach(name => {
+    ['difficulty', 'color'].forEach(name => {
       const el = p.querySelector(`input[name=${name}][value="${settings[name]}"]`);
       if (el) el.checked = true;
     });
     p.style.display = 'flex';
+  }
+
+  function toggleDots() {
+    showDots = !showDots;
+    document.getElementById('dots-btn').style.opacity = showDots ? '1' : '0.4';
+    render();
   }
 
   function updateUI() {
@@ -1255,7 +1259,6 @@
   function applySettings() {
     settings.difficulty = document.querySelector('input[name=difficulty]:checked').value;
     settings.color = document.querySelector('input[name=color]:checked').value;
-    settings.dots = document.querySelector('input[name=dots]:checked').value;
     localStorage.setItem('arrowPuzzleSettings', JSON.stringify(settings));
     const ep = getEffectiveParams();
     N = ep.arrows;
@@ -1374,7 +1377,7 @@
       'bends: ' + ep.minBends + '-' + ep.maxBends + '<br>' +
       'seg: ' + ep.minSeg + '-' + ep.maxSeg + '<br>' +
       'color: ' + (ep.color || settings.color) + '<br>' +
-      'dots: ' + (ep.dots || settings.dots) + '<br>' +
+      'dots: ' + (showDots ? 'show' : 'hide') + '<br>' +
       'timeout: ' + ep.timeout + 's';
   }
 
@@ -1385,6 +1388,8 @@
     COLS = ep.cols;
     ROWS = ep.rows;
     N = ep.arrows;
+    if (devParams.dots) showDots = devParams.dots === 'show';
+    document.getElementById('dots-btn').style.opacity = showDots ? '1' : '0.4';
     document.getElementById('dev-wm').style.display = 'block';
     document.getElementById('devpanel').style.display = 'none';
     updateDevSidebar();
