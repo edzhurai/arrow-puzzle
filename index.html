@@ -408,6 +408,7 @@
   }
 
   function placeArrowsFull() {
+    console.log('placeArrowsFull: generating full coverage for ' + COLS + 'x' + ROWS + ' grid (ignoring N=' + N + ')');
     const totalDots = COLS * ROWS;
     const targetPhase1 = Math.floor(totalDots * 0.85);
     const maxAttempts = 500;
@@ -1018,6 +1019,7 @@
     errors = 0;
     hints = 0;
     cleared = false;
+    N = settings.arrows;
     resetCam();
     placeArrows();
     updateUI();
