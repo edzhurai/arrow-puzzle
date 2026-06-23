@@ -237,6 +237,10 @@
 </div>
 <div id="dev-sidebar" style="display:none"></div>
 <script>
+  let devMode = false;
+  let devParams = { cols: 15, rows: 15, fill: 'normal', arrows: 35, minSeg: 1, maxSeg: 5, minBends: 0, maxBends: 4, nminMin: 2, nminMax: 4, timeout: 5, color: '', dots: '' };
+  let isLayingOut = false;
+
   const DIFFICULTY_PRESETS = {
     easy:   { grid: 10, fill: 'normal', arrows: 15, bends: 'simple',  nminMin: 8,  nminMax: 12, minSeg: 2, maxSeg: 4, timeout: 5 },
     medium: { grid: 15, fill: 'normal', arrows: 35, bends: 'complex', nminMin: 4,  nminMax: 7,  minSeg: 1, maxSeg: 5, timeout: 5 },
@@ -280,10 +284,7 @@
   let animLoop = null;
   let level = 1, errors = 0, hints = 0, lastCoverage = 100;
   let hintTimer = null;
-  let devMode = false;
-  let devParams = { cols: 15, rows: 15, fill: 'normal', arrows: 35, minSeg: 1, maxSeg: 5, minBends: 0, maxBends: 4, nminMin: 2, nminMax: 4, timeout: 5, color: '', dots: '' };
   let lastWinW = 0, lastWinH = 0;
-  let isLayingOut = false;
   let genTimerInterval = null, genStartTime = 0;
 
   function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
