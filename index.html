@@ -433,8 +433,35 @@
     return false;
   }
 
-  function fillPhase(target, occupied, generated, bendMin, bendMax, opts) {
-    while (occupied.size < target) {
+  function countFree(list) {
+    const dots = new Set();
+    const dirs = [];
+    for (let i = 0; i < list.length; i++) {
+      dirs.push(headDir(list[i]));
+      for (const p of list[i].path) dots.add(`${p.c},${p.r}`);
+    }
+    let free = 0;
+    for (let i = 0; i < list.length; i++) {
+      const head = list[i].path[list[i].path.length - 1];
+      const d = dirs[i];
+      let blocked = false;
+      let c = head.c + DX[d], r = head.r + DY[d];
+      while (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+        if (dots.has(`${c},${r}`)) {
+          let self = false;
+          for (const p of list[i].path) { if (p.c === c && p.r === r) { self = true; break; } }
+          if (!self) { blocked = true; break; }
+        }
+        c += DX[d]; r += DY[d];
+      }
+      if (!blocked) free++;
+    }
+    return free;
+  }
+
+  function fillPhaseConstrained(target, occupied, generated, bendMin, bendMax, opts, minNmin) {
+    let stalls = 0;
+    while (occupied.size < target && stalls < 100) {
       let placed = false;
       for (let retry = 0; retry < 80; retry++) {
         const bends = randInt(bendMin, bendMax);
@@ -444,21 +471,29 @@
         for (const existing of generated) {
           if (headsConflict(candidate, existing)) { conflict = true; break; }
         }
-        if (!conflict) {
-          generated.push(candidate);
-          for (const p of candidate.path) occupied.add(`${p.c},${p.r}`);
-          placed = true;
-          break;
+        if (conflict) continue;
+
+        generated.push(candidate);
+        for (const p of candidate.path) occupied.add(`${p.c},${p.r}`);
+
+        const nmin = countFree(generated);
+        if (nmin < minNmin) {
+          generated.pop();
+          for (const p of candidate.path) occupied.delete(`${p.c},${p.r}`);
+          continue;
         }
+        placed = true;
+        break;
       }
-      if (!placed) break;
+      if (!placed) { stalls++; continue; }
+      stalls = 0;
     }
   }
 
   function placeArrowsFull() {
     console.log('placeArrowsFull: generating full coverage for ' + COLS + 'x' + ROWS + ' grid');
     const totalDots = COLS * ROWS;
-    const maxAttempts = 500;
+    const maxAttempts = 300;
     let stats = { coverageFail: 0, conflictFail: 0, solveFail: 0 };
 
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
@@ -466,33 +501,42 @@
       const all = [];
       const log = puzzleAttempt < 3;
 
-      // Phase 1: Large arrows (3-4 bends, 4-6 dot segments) → ~40%
-      fillPhase(Math.floor(totalDots * 0.40), occupied, all, 3, 4, { minSeg: 3, maxSeg: 6 });
-      if (log) console.log('  #' + puzzleAttempt + ' P1 large: ' + all.length + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%)');
+      // Phase 1: Complex arrows (3-4 bends, 3-6 dot segments) → ~40%
+      fillPhaseConstrained(Math.floor(totalDots * 0.40), occupied, all, 3, 4, { minSeg: 3, maxSeg: 6 }, 2);
+      const nmin1 = countFree(all);
+      if (log) console.log('  #' + puzzleAttempt + ' P1 complex: ' + all.length + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), Nmin=' + nmin1);
 
-      // Phase 2: Medium arrows (1-2 bends, 3-4 dot segments) → ~70%
+      // Phase 2: Medium arrows (1-2 bends, 2-4 dot segments) → ~70%
       const p2Start = all.length;
-      fillPhase(Math.floor(totalDots * 0.70), occupied, all, 1, 2, { minSeg: 2, maxSeg: 4 });
-      if (log) console.log('  #' + puzzleAttempt + ' P2 medium: +' + (all.length - p2Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%)');
+      fillPhaseConstrained(Math.floor(totalDots * 0.70), occupied, all, 1, 2, { minSeg: 2, maxSeg: 4 }, 2);
+      const nmin2 = countFree(all);
+      if (log) console.log('  #' + puzzleAttempt + ' P2 medium: +' + (all.length - p2Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), Nmin=' + nmin2);
 
-      // Phase 3: Small arrows (0-1 bends, 2-3 dot segments) → ~90%
+      // Phase 3: Small arrows (0-1 bends, 1-3 dot segments) → ~90%
       const p3Start = all.length;
-      fillPhase(Math.floor(totalDots * 0.90), occupied, all, 0, 1, { minSeg: 1, maxSeg: 3 });
-      if (log) console.log('  #' + puzzleAttempt + ' P3 small: +' + (all.length - p3Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%)');
+      fillPhaseConstrained(Math.floor(totalDots * 0.90), occupied, all, 0, 1, { minSeg: 1, maxSeg: 3 }, 2);
+      const nmin3 = countFree(all);
+      if (log) console.log('  #' + puzzleAttempt + ' P3 small: +' + (all.length - p3Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), Nmin=' + nmin3);
 
-      // Phase 4: Fillers (minimum 2-dot straight arrows)
+      // Phase 4: Fillers (2-dot straight arrows, still constrained)
+      const p4Start = all.length;
+      fillPhaseConstrained(totalDots, occupied, all, 0, 0, { minSeg: 1, maxSeg: 2 }, 2);
+      const nmin4 = countFree(all);
+      if (log) console.log('  #' + puzzleAttempt + ' P4 fillers: +' + (all.length - p4Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), Nmin=' + nmin4);
+
+      // Phase 5: Unconstrained fillers for remaining gaps
       const uncovered = new Set();
       for (let r = 0; r < ROWS; r++)
         for (let c = 0; c < COLS; c++)
           if (!occupied.has(`${c},${r}`)) uncovered.add(`${c},${r}`);
-      const p4Start = all.length;
-      const fillers = generateFiller(occupied, uncovered);
-      for (const f of fillers) all.push(f);
-      occupied.clear();
-      for (const a of all) for (const p of a.path) occupied.add(`${p.c},${p.r}`);
-      if (log) console.log('  #' + puzzleAttempt + ' P4 fillers: +' + (all.length - p4Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%)');
+      if (uncovered.size > 0) {
+        const fillers = generateFiller(occupied, uncovered);
+        for (const f of fillers) all.push(f);
+        occupied.clear();
+        for (const a of all) for (const p of a.path) occupied.add(`${p.c},${p.r}`);
+      }
 
-      // Phase 5: Extensions (extend tails to cover orphans)
+      // Phase 6: Extensions for orphans
       const orphans = [];
       for (let r = 0; r < ROWS; r++)
         for (let c = 0; c < COLS; c++)
@@ -506,10 +550,9 @@
         }
         if (!filled) unfilled.push(dot);
       }
+      const finalNmin = countFree(all);
       if (log) {
-        console.log('  #' + puzzleAttempt + ' P5 extend: +' + extended + ', ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), unfilled: ' + unfilled.length);
-        if (unfilled.length > 0 && unfilled.length <= 10)
-          console.log('    unfilled:', unfilled.map(d => '(' + d.c + ',' + d.r + ')').join(' '));
+        console.log('  #' + puzzleAttempt + ' P5+6 cleanup: +' + extended + ' ext, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), unfilled=' + unfilled.length + ', finalNmin=' + finalNmin);
       }
 
       if (occupied.size < totalDots) { stats.coverageFail++; continue; }
@@ -520,10 +563,11 @@
           if (headsConflict(all[i], all[j])) hasConflict = true;
       if (hasConflict) { stats.conflictFail++; continue; }
 
-      arrows = all;
       const solvable = isSolvable(all);
-      console.log('Full coverage generated (#' + puzzleAttempt + ', ' + arrows.length + ' arrows, ' + occupied.size + '/' + totalDots + ', solvable=' + solvable + ')');
-      if (!solvable) stats.solveFail++;
+      if (!solvable) { stats.solveFail++; continue; }
+
+      arrows = all;
+      console.log('Full coverage generated (#' + puzzleAttempt + ', ' + arrows.length + ' arrows, ' + occupied.size + '/' + totalDots + ', Nmin=' + finalNmin + ', solvable=true)');
       cleared = false;
       return;
     }
