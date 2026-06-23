@@ -500,7 +500,9 @@
     let best = null, bestCov = 0;
 
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
-      if (Date.now() - startTime > 5000) {
+      const elapsed = Date.now() - startTime;
+      console.log('timeout check:', elapsed);
+      if (elapsed > 5000) {
         console.warn('placeArrowsFull: 5s timeout after ' + puzzleAttempt + ' attempts');
         break;
       }
