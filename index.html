@@ -27,15 +27,19 @@
     background: rgba(255,255,255,0.15); border: none; border-radius: 6px;
     color: #fff; font-size: 13px; padding: 5px 8px; cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
   }
   .hdr-btn:hover { background: rgba(255,255,255,0.3); }
+  .hdr-btn.btn-active { background: rgba(255,255,255,0.5); }
   #gear {
     width: 30px; height: 30px;
     background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
     color: #fff; font-size: 16px; cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
   }
   #gear:hover { background: rgba(255,255,255,0.3); }
+  #gear.btn-active { background: rgba(255,255,255,0.5); }
   #clear-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(26,26,46,0.92);
@@ -48,8 +52,10 @@
   .cs button {
     background: #e94560; border: none; border-radius: 8px;
     color: #fff; font-size: 18px; padding: 12px 32px; cursor: pointer;
+    transition: background 0.15s;
   }
   .cs button:hover { background: #d63850; }
+  .cs button.btn-active { background: #ff6b8a; }
   #panel {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.7);
@@ -1281,6 +1287,13 @@
     console.log('Header debug: innerWidth=' + window.innerWidth + ' hdr.offsetWidth=' + hdr.offsetWidth + ' hdr.scrollWidth=' + hdr.scrollWidth + ' computedPaddingRight=' + getComputedStyle(hdr).paddingRight);
     console.log('Screen debug: screen.width=' + window.screen.width + ' screen.availWidth=' + window.screen.availWidth + ' devicePixelRatio=' + window.devicePixelRatio);
   }
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    btn.classList.add('btn-active');
+    setTimeout(() => btn.classList.remove('btn-active'), 150);
+  });
 
   requestAnimationFrame(() => { init(); });
   window.addEventListener('resize', () => {
