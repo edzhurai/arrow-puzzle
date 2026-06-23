@@ -1234,6 +1234,22 @@
         return;
       }
     }
+    const remaining = [];
+    for (let i = 0; i < arrows.length; i++) {
+      if (!arrows[i].alive) continue;
+      const dir = headDir(arrows[i]);
+      const head = arrows[i].path[arrows[i].path.length - 1];
+      const bd = blockerDist(i);
+      remaining.push({ idx: i, dir: dir, head: `(${head.c},${head.r})`, blockerDist: bd, pathLen: arrows[i].path.length });
+    }
+    console.warn('DEADLOCK: No free arrows! ' + remaining.length + ' remaining:', remaining);
+    const el = document.getElementById('gen-timer');
+    el.textContent = 'No moves!';
+    el.style.color = '#e94560';
+    hintTimer = setTimeout(() => {
+      el.style.color = '';
+      hintTimer = null;
+    }, 2000);
   }
 
   function showClearScreen() {
