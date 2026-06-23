@@ -407,6 +407,29 @@
     return fillers;
   }
 
+  function tryExtendArrow(arrow, dot, allArrows, occupied) {
+    const dc = dot.c, dr = dot.r;
+    const tail = arrow.path[0];
+    const second = arrow.path[1];
+    const tailDirC = tail.c - second.c;
+    const tailDirR = tail.r - second.r;
+    if (dc === tail.c + tailDirC && dr === tail.r + tailDirR) {
+      const newPath = [{ c: dc, r: dr }, ...arrow.path];
+      const last = newPath[newPath.length - 1];
+      const prev = newPath[newPath.length - 2];
+      const hdc = Math.sign(last.c - prev.c);
+      const hdr = Math.sign(last.r - prev.r);
+      const headProj = hdc * last.c + hdr * last.r;
+      for (const p of newPath) {
+        if (hdc * p.c + hdr * p.r > headProj) return false;
+      }
+      arrow.path = newPath;
+      occupied.add(`${dc},${dr}`);
+      return true;
+    }
+    return false;
+  }
+
   function placeArrowsFull() {
     console.log('placeArrowsFull: generating full coverage for ' + COLS + 'x' + ROWS + ' grid (ignoring N=' + N + ')');
     const totalDots = COLS * ROWS;
@@ -449,14 +472,39 @@
       const fillers = generateFiller(occupied, uncovered);
       const all = generated.concat(fillers);
 
-      const coveredAfter = new Set();
-      for (const a of all) for (const p of a.path) coveredAfter.add(`${p.c},${p.r}`);
+      // Rebuild occupied from all arrows
+      occupied.clear();
+      for (const a of all) for (const p of a.path) occupied.add(`${p.c},${p.r}`);
 
-      if (puzzleAttempt < 3) {
-        console.log('  attempt ' + puzzleAttempt + ' phase2: ' + fillers.length + ' fillers, ' + coveredAfter.size + '/' + totalDots + ' dots (' + (coveredAfter.size / totalDots * 100).toFixed(1) + '%), uncovered remaining: ' + (totalDots - coveredAfter.size));
+      // Phase 3: extend adjacent arrows to cover orphaned dots
+      const orphans = [];
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++)
+          if (!occupied.has(`${c},${r}`)) orphans.push({ c, r });
+
+      let extended = 0;
+      const unfilled = [];
+      for (const dot of orphans) {
+        let filled = false;
+        for (const a of all) {
+          if (tryExtendArrow(a, dot, all, occupied)) {
+            extended++;
+            filled = true;
+            break;
+          }
+        }
+        if (!filled) unfilled.push(dot);
       }
 
-      if (coveredAfter.size < totalDots) { stats.coverageFail++; continue; }
+      if (puzzleAttempt < 3) {
+        const covCount = occupied.size;
+        console.log('  attempt ' + puzzleAttempt + ' phase2: ' + fillers.length + ' fillers, phase3: ' + extended + ' extensions, ' + covCount + '/' + totalDots + ' dots (' + (covCount / totalDots * 100).toFixed(1) + '%), unfilled: ' + unfilled.length);
+        if (unfilled.length > 0 && unfilled.length <= 5) {
+          console.log('  unfilled dots:', unfilled.map(d => '(' + d.c + ',' + d.r + ')').join(' '));
+        }
+      }
+
+      if (occupied.size < totalDots) { stats.coverageFail++; continue; }
 
       let hasConflict = false;
       for (let i = 0; i < all.length && !hasConflict; i++)
@@ -464,10 +512,9 @@
           if (headsConflict(all[i], all[j])) hasConflict = true;
       if (hasConflict) { stats.conflictFail++; continue; }
 
-      // Temporarily accept without solvability check to test coverage
       arrows = all;
       const solvable = isSolvable(all);
-      console.log('Full coverage puzzle generated (' + puzzleAttempt + ' attempts, ' + arrows.length + ' arrows, ' + coveredAfter.size + '/' + totalDots + ' dots, solvable=' + solvable + ')');
+      console.log('Full coverage puzzle generated (' + puzzleAttempt + ' attempts, ' + arrows.length + ' arrows, ' + occupied.size + '/' + totalDots + ' dots, solvable=' + solvable + ')');
       if (!solvable) stats.solveFail++;
       cleared = false;
       return;
