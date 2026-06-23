@@ -599,6 +599,16 @@
     }
 
     if (best) {
+      let hasConflict = false;
+      for (let i = 0; i < best.length && !hasConflict; i++)
+        for (let j = i + 1; j < best.length && !hasConflict; j++)
+          if (headsConflict(best[i], best[j])) hasConflict = true;
+      if (hasConflict) {
+        console.warn('Full coverage fallback rejected: head-on conflict detected, falling back to normal');
+        lastCoverage = 100;
+        placeArrowsNormal();
+        return;
+      }
       arrows = best;
       lastCoverage = Math.round(bestCov / totalDots * 1000) / 10;
       console.warn('Full coverage fallback: ' + arrows.length + ' arrows, ' + bestCov + '/' + totalDots + ' (' + lastCoverage + '%). stats: coverage=' + stats.coverageFail + ' conflict=' + stats.conflictFail + ' solve=' + stats.solveFail);
