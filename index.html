@@ -172,7 +172,6 @@
   <span id="err">Errors: 0</span>
   <span id="gen-timer"></span>
   <div id="hdr-r">
-    <button class="hdr-btn" onclick="resetCam();render()">&#8634;</button>
     <button id="hint-btn" class="hdr-btn" onclick="useHint()">Hint</button>
     <button id="dots-btn" class="hdr-btn" onclick="toggleDots()" style="font-size:16px;padding:3px 8px">&#183;</button>
     <button id="gear" onclick="toggleSettings()">&#9881;</button>
@@ -1207,9 +1206,14 @@
     render();
   }
 
+  function difficultyLabel() {
+    const d = devMode ? 'DEV' : settings.difficulty;
+    return d.charAt(0).toUpperCase() + d.slice(1);
+  }
+
   function updateUI() {
-    document.getElementById('lvl').textContent = 'Level ' + level;
-    document.getElementById('err').textContent = 'Errors: ' + errors;
+    document.getElementById('lvl').textContent = difficultyLabel() + ' L' + level;
+    document.getElementById('err').textContent = 'Err: ' + errors;
   }
 
   function useHint() {
@@ -1234,13 +1238,16 @@
 
   function showClearScreen() {
     const cs = document.getElementById('clear-screen');
-    cs.querySelector('.cs-lvl').textContent = 'Level ' + level;
+    cs.querySelector('.cs-lvl').textContent = difficultyLabel() + ' L' + level;
     cs.querySelector('.cs-err').textContent = errors + ' Error' + (errors !== 1 ? 's' : '');
     const covEl = cs.querySelector('.cs-cov');
-    const covPct = lastCoverage >= 100 ? '100%' : lastCoverage.toFixed(1) + '%';
+    const _cov = new Set();
+    for (const a of arrows) for (const p of a.path) _cov.add(`${p.c},${p.r}`);
+    const actualCov = (_cov.size / (COLS * ROWS) * 100);
+    const covPct = actualCov >= 99.95 ? '100%' : actualCov.toFixed(1) + '%';
     const nmin = countFree(arrows);
-    covEl.textContent = covPct + ' Coverage · Nmin=' + nmin;
-    covEl.style.color = lastCoverage >= 100 ? '#4ade80' : 'rgba(255,255,255,0.5)';
+    covEl.textContent = covPct + ' Coverage · Starting moves: ' + nmin;
+    covEl.style.color = actualCov >= 99.95 ? '#4ade80' : 'rgba(255,255,255,0.5)';
     cs.style.display = 'flex';
   }
 
@@ -1491,7 +1498,7 @@
     setTimeout(() => btn.classList.remove('btn-active'), 150);
   });
 
-  requestAnimationFrame(() => { init(); });
+  requestAnimationFrame(() => { requestAnimationFrame(() => { init(); }); });
   window.addEventListener('resize', () => {
     const w = window.innerWidth, h = window.innerHeight;
     if (w === lastWinW && h === lastWinH) return;
