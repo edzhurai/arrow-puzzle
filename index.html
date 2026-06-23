@@ -124,7 +124,7 @@
   #dev-sidebar {
     position: fixed; top: 50px; left: 0; bottom: 0; width: 140px;
     background: rgba(10,10,26,0.85); border-right: 1px solid rgba(233,69,96,0.3);
-    color: rgba(255,255,255,0.7); font: 11px/1.6 monospace;
+    color: #4ade80; font: 11px/1.6 monospace;
     padding: 8px 6px; z-index: 5; pointer-events: none;
     overflow: hidden;
   }
@@ -1287,10 +1287,12 @@
   }
 
   document.getElementById('dev-pw-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      if (this.value === 'edz') { hideDevPw(); openDevPanel(); }
-      else { hideDevPw(); }
-    } else if (e.key === 'Escape') { hideDevPw(); }
+    if (e.key === 'Escape') { hideDevPw(); }
+  });
+  document.getElementById('dev-pw-input').addEventListener('input', function() {
+    if (this.value.length < 4) return;
+    if (this.value === 'edxz') { hideDevPw(); openDevPanel(); }
+    else { this.value = ''; }
   });
 
   document.getElementById('dev-pw-input').addEventListener('blur', function() {
