@@ -133,6 +133,7 @@
   <div class="cs">
     <div class="cs-lvl">Level 1</div>
     <div class="cs-err">0 Errors</div>
+    <div class="cs-cov" style="font-size:16px;color:rgba(255,255,255,0.5);margin-bottom:20px"></div>
     <button onclick="nextLevel()">Next Level</button>
   </div>
 </div>
@@ -203,7 +204,7 @@
   let camScale = 1, camOffX = 0, camOffY = 0;
   const anims = new Map();
   let animLoop = null;
-  let level = 1, errors = 0, hints = 0;
+  let level = 1, errors = 0, hints = 0, lastCoverage = 100;
   let clearTimer = null, hintTimer = null;
   let devMode = false;
   let devParams = { cols: 15, rows: 15, arrows: 35, minSeg: 1, maxSeg: 5, maxBends: 4, maxAttempts: 200 };
@@ -494,35 +495,30 @@
     console.log('placeArrowsFull: generating full coverage for ' + COLS + 'x' + ROWS + ' grid');
     const totalDots = COLS * ROWS;
     const maxAttempts = 300;
+    const deadline = performance.now() + 5000;
     let stats = { coverageFail: 0, conflictFail: 0, solveFail: 0 };
+    let best = null, bestCov = 0;
 
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
+      if (performance.now() > deadline) {
+        console.warn('placeArrowsFull: 5s timeout after ' + puzzleAttempt + ' attempts');
+        break;
+      }
       const occupied = new Set();
       const all = [];
       const log = puzzleAttempt < 3;
 
-      // Phase 1: Complex arrows (1-2 bends, 3-6 dot segments) → ~40%
       fillPhaseConstrained(Math.floor(totalDots * 0.40), occupied, all, 1, 2, { minSeg: 3, maxSeg: 6 }, 2);
-      const nmin1 = countFree(all);
-      if (log) console.log('  #' + puzzleAttempt + ' P1 complex: ' + all.length + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), Nmin=' + nmin1);
+      if (log) console.log('  #' + puzzleAttempt + ' P1: ' + all.length + ' arrows, ' + occupied.size + '/' + totalDots);
 
-      // Phase 2: Medium arrows (1-2 bends, 2-4 dot segments) → ~70%
-      const p2Start = all.length;
       fillPhaseConstrained(Math.floor(totalDots * 0.70), occupied, all, 1, 2, { minSeg: 2, maxSeg: 4 }, 2);
-      const nmin2 = countFree(all);
-      if (log) console.log('  #' + puzzleAttempt + ' P2 medium: +' + (all.length - p2Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), Nmin=' + nmin2);
+      if (log) console.log('  #' + puzzleAttempt + ' P2: ' + all.length + ' arrows, ' + occupied.size + '/' + totalDots);
 
-      // Phase 3: Small arrows (0-1 bends, 1-3 dot segments) → ~90%
-      const p3Start = all.length;
       fillPhaseConstrained(Math.floor(totalDots * 0.90), occupied, all, 0, 1, { minSeg: 1, maxSeg: 3 }, 2);
-      const nmin3 = countFree(all);
-      if (log) console.log('  #' + puzzleAttempt + ' P3 small: +' + (all.length - p3Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), Nmin=' + nmin3);
+      if (log) console.log('  #' + puzzleAttempt + ' P3: ' + all.length + ' arrows, ' + occupied.size + '/' + totalDots);
 
-      // Phase 4: Fillers (2-dot straight arrows, still constrained)
-      const p4Start = all.length;
       fillPhaseConstrained(totalDots, occupied, all, 0, 0, { minSeg: 1, maxSeg: 2 }, 2);
-      const nmin4 = countFree(all);
-      if (log) console.log('  #' + puzzleAttempt + ' P4 fillers: +' + (all.length - p4Start) + ' arrows, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), Nmin=' + nmin4);
+      if (log) console.log('  #' + puzzleAttempt + ' P4: ' + all.length + ' arrows, ' + occupied.size + '/' + totalDots);
 
       // Phase 5: Unconstrained fillers for remaining gaps
       const uncovered = new Set();
@@ -536,29 +532,21 @@
         for (const a of all) for (const p of a.path) occupied.add(`${p.c},${p.r}`);
       }
 
-      // Phase 6: Aggressive tail extensions — multiple passes until no progress
-      let extended = 0;
+      // Phase 6: Aggressive tail extensions
       let progress = true;
       while (progress && occupied.size < totalDots) {
         progress = false;
-        for (let r = 0; r < ROWS; r++) {
+        for (let r = 0; r < ROWS; r++)
           for (let c = 0; c < COLS; c++) {
             if (occupied.has(`${c},${r}`)) continue;
-            const dot = { c, r };
-            for (const a of all) {
-              if (tryExtendArrow(a, dot, all, occupied)) { extended++; progress = true; break; }
-            }
+            for (const a of all)
+              if (tryExtendArrow(a, { c, r }, all, occupied)) { progress = true; break; }
           }
-        }
       }
-      const unfilled = [];
-      for (let r = 0; r < ROWS; r++)
-        for (let c = 0; c < COLS; c++)
-          if (!occupied.has(`${c},${r}`)) unfilled.push(`${c},${r}`);
-      const finalNmin = countFree(all);
-      if (log) {
-        console.log('  #' + puzzleAttempt + ' P5+6 cleanup: +' + extended + ' ext, ' + occupied.size + '/' + totalDots + ' (' + (occupied.size / totalDots * 100).toFixed(1) + '%), unfilled=' + unfilled.length + ', finalNmin=' + finalNmin);
-        if (unfilled.length > 0) console.log('    unfilled dots: ' + unfilled.join(' '));
+
+      if (occupied.size > bestCov) {
+        best = all.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false }));
+        bestCov = occupied.size;
       }
 
       if (occupied.size < totalDots) { stats.coverageFail++; continue; }
@@ -569,16 +557,24 @@
           if (headsConflict(all[i], all[j])) hasConflict = true;
       if (hasConflict) { stats.conflictFail++; continue; }
 
-      const solvable = isSolvable(all);
-      if (!solvable) { stats.solveFail++; continue; }
+      if (!isSolvable(all)) { stats.solveFail++; continue; }
 
       arrows = all;
-      console.log('Full coverage generated (#' + puzzleAttempt + ', ' + arrows.length + ' arrows, ' + occupied.size + '/' + totalDots + ', Nmin=' + finalNmin + ', solvable=true)');
+      lastCoverage = 100;
+      console.log('Full coverage generated (#' + puzzleAttempt + ', ' + arrows.length + ' arrows, ' + bestCov + '/' + totalDots + ', solvable=true)');
       cleared = false;
       return;
     }
-    console.warn('Full coverage failed (' + maxAttempts + ' attempts). coverage=' + stats.coverageFail + ' conflict=' + stats.conflictFail + ' solve=' + stats.solveFail);
-    placeArrowsNormal();
+
+    if (best) {
+      arrows = best;
+      lastCoverage = Math.round(bestCov / totalDots * 1000) / 10;
+      console.warn('Full coverage fallback: ' + arrows.length + ' arrows, ' + bestCov + '/' + totalDots + ' (' + lastCoverage + '%). stats: coverage=' + stats.coverageFail + ' conflict=' + stats.conflictFail + ' solve=' + stats.solveFail);
+      cleared = false;
+    } else {
+      lastCoverage = 100;
+      placeArrowsNormal();
+    }
   }
 
   function placeArrowsNormal() {
@@ -1127,6 +1123,9 @@
     const cs = document.getElementById('clear-screen');
     cs.querySelector('.cs-lvl').textContent = 'Level ' + level;
     cs.querySelector('.cs-err').textContent = errors + ' Error' + (errors !== 1 ? 's' : '');
+    const covEl = cs.querySelector('.cs-cov');
+    covEl.textContent = lastCoverage >= 100 ? '100% Coverage' : lastCoverage.toFixed(1) + '% Coverage';
+    covEl.style.color = lastCoverage >= 100 ? '#4ade80' : 'rgba(255,255,255,0.5)';
     cs.style.display = 'flex';
     clearTimer = setTimeout(nextLevel, 3000);
   }
