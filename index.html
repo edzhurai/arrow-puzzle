@@ -194,7 +194,7 @@
     <label><input type="radio" name="difficulty" value="easy"> Easy</label>
     <label><input type="radio" name="difficulty" value="medium"> Medium</label>
     <label><input type="radio" name="difficulty" value="hard"> Hard</label>
-    <label><input type="radio" name="difficulty" value="expert"> Expert</label>
+    <label id="expert-option"><input type="radio" name="difficulty" value="expert"> Expert</label>
     <span class="gl">Color</span>
     <label><input type="radio" name="color" value="multi"> Multicolor</label>
     <label><input type="radio" name="color" value="mono"> Monochrome</label>
@@ -236,10 +236,11 @@
 <div id="dev-sidebar" style="display:none"></div>
 <script>
   let devMode = false;
+  const isMobile = window.innerWidth < 500 || 'ontouchstart' in window;
   let devSidebarVisible = (function() {
     const s = localStorage.getItem('devSidebarVisible');
     if (s !== null) return s === '1';
-    return window.innerWidth >= 500;
+    return !isMobile;
   })();
   let devParams = { cols: 15, rows: 15, fill: 'normal', arrows: 35, minSeg: 1, maxSeg: 5, minBends: 0, maxBends: 4, nminMin: 2, nminMax: 4, timeout: 5, color: '', dots: '' };
   let isLayingOut = false;
@@ -255,6 +256,11 @@
   const saved = localStorage.getItem('arrowPuzzleSettings');
   let settings = saved ? Object.assign({}, DEFAULTS, JSON.parse(saved)) : Object.assign({}, DEFAULTS);
   if (!DIFFICULTY_PRESETS[settings.difficulty]) settings.difficulty = 'medium';
+  if (isMobile && settings.difficulty === 'expert') {
+    settings.difficulty = 'hard';
+    localStorage.setItem('arrowPuzzleSettings', JSON.stringify(settings));
+  }
+  if (isMobile) document.getElementById('expert-option').style.display = 'none';
 
   function getEffectiveParams() {
     if (devMode) {
