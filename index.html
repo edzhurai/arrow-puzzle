@@ -406,25 +406,29 @@
     return ha.r === hb.r;
   }
 
+  function isArrowFree(idx, arrowList) {
+    const a = arrowList[idx];
+    const dir = headDir(a);
+    const head = a.path[a.path.length - 1];
+    const otherDots = new Set();
+    for (let i = 0; i < arrowList.length; i++) {
+      if (i === idx) continue;
+      for (const p of arrowList[i].path) otherDots.add(`${p.c},${p.r}`);
+    }
+    let c = head.c + DX[dir], r = head.r + DY[dir];
+    while (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+      if (otherDots.has(`${c},${r}`)) return false;
+      c += DX[dir]; r += DY[dir];
+    }
+    return true;
+  }
+
   function isSolvable(list) {
-    const remaining = list.map(a => ({ path: a.path, dir: headDir(a) }));
+    const remaining = list.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false }));
     while (remaining.length > 0) {
       let found = false;
       for (let i = 0; i < remaining.length; i++) {
-        const a = remaining[i];
-        const head = a.path[a.path.length - 1];
-        const otherDots = new Set();
-        for (let j = 0; j < remaining.length; j++) {
-          if (j === i) continue;
-          for (const p of remaining[j].path) otherDots.add(`${p.c},${p.r}`);
-        }
-        let blocked = false;
-        let c = head.c + DX[a.dir], r = head.r + DY[a.dir];
-        while (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
-          if (otherDots.has(`${c},${r}`)) { blocked = true; break; }
-          c += DX[a.dir]; r += DY[a.dir];
-        }
-        if (!blocked) {
+        if (isArrowFree(i, remaining)) {
           remaining.splice(i, 1);
           found = true;
           break;
@@ -659,8 +663,8 @@
       for (let i = 0; i < best.length && !hasConflict; i++)
         for (let j = i + 1; j < best.length && !hasConflict; j++)
           if (headsConflict(best[i], best[j])) hasConflict = true;
-      if (hasConflict) {
-        console.warn('Full coverage fallback rejected: head-on conflict detected, falling back to normal');
+      if (hasConflict || !isSolvable(best)) {
+        console.warn('Full coverage fallback rejected: ' + (hasConflict ? 'head-on conflict' : 'unsolvable') + ', falling back to normal');
         lastCoverage = 100;
         await placeArrowsNormal();
         return;
