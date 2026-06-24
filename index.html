@@ -171,6 +171,7 @@
   <button class="hdr-btn" onclick="showDevPw()" style="font-size:10px;padding:3px 6px;opacity:0.5">DEV</button>
   <span id="err">Errors: 0</span>
   <span id="gen-timer"></span>
+  <button id="cancel-gen" class="hdr-btn" style="display:none;background:rgba(233,69,96,0.6)" onclick="cancelGeneration=true">Stop</button>
   <div id="hdr-r">
     <button id="hint-btn" class="hdr-btn" onclick="useHint()">Hint</button>
     <button id="dots-btn" class="hdr-btn" onclick="toggleDots()" style="font-size:16px;padding:3px 8px">&#183;</button>
@@ -296,6 +297,7 @@
   let hintTimer = null;
   let lastWinW = 0, lastWinH = 0;
   let genTimerInterval = null, genStartTime = 0;
+  let cancelGeneration = false;
 
   function randInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
 
@@ -598,6 +600,10 @@
 
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
       if (puzzleAttempt % 5 === 0) await new Promise(r => setTimeout(r, 0));
+      if (cancelGeneration) {
+        console.warn('placeArrowsFull: cancelled by user after ' + puzzleAttempt + ' attempts');
+        break;
+      }
       if (Date.now() - startTime > timeoutMs) {
         console.warn('placeArrowsFull: 5s timeout after ' + puzzleAttempt + ' attempts');
         break;
@@ -675,7 +681,7 @@
       for (let i = 0; i < best.length && !hasConflict; i++)
         for (let j = i + 1; j < best.length && !hasConflict; j++)
           if (headsConflict(best[i], best[j])) hasConflict = true;
-      if (hasConflict || !isSolvable(best)) {
+      if (!cancelGeneration && (hasConflict || !isSolvable(best))) {
         console.warn('Full coverage fallback rejected: ' + (hasConflict ? 'head-on conflict' : 'unsolvable') + ', falling back to normal');
         lastCoverage = 100;
         await placeArrowsNormal();
@@ -685,7 +691,7 @@
       lastCoverage = Math.round(bestCov / totalDots * 1000) / 10;
       console.warn('Full coverage fallback: ' + arrows.length + ' arrows, ' + bestCov + '/' + totalDots + ' (' + lastCoverage + '%). stats: coverage=' + stats.coverageFail + ' conflict=' + stats.conflictFail + ' solve=' + stats.solveFail);
       cleared = false;
-    } else {
+    } else if (!cancelGeneration) {
       lastCoverage = 100;
       await placeArrowsNormal();
     }
@@ -697,6 +703,11 @@
     const maxAttempts = 200;
     for (let puzzleAttempt = 0; puzzleAttempt < maxAttempts; puzzleAttempt++) {
       if (puzzleAttempt % 10 === 0) await new Promise(r => setTimeout(r, 0));
+      if (cancelGeneration) {
+        console.warn('placeArrowsNormal: cancelled by user after ' + puzzleAttempt + ' attempts');
+        if (arrows.length > 0) { cleared = false; return; }
+        break;
+      }
       const occupied = new Set();
       const generated = [];
       let success = true;
@@ -734,6 +745,7 @@
         return;
       }
     }
+    if (cancelGeneration) return;
     console.warn('Could not generate puzzle with >= ' + Math.ceil(N / 2) + ' arrows, reducing target');
     N = Math.max(1, Math.ceil(N / 2));
     await placeArrowsNormal();
@@ -1498,13 +1510,22 @@
     document.getElementById('gen-timer').textContent = covPct + '% · ' + nmin + '↗';
   }
 
+  function setGeneratingUI(active) {
+    document.getElementById('cancel-gen').style.display = active ? '' : 'none';
+    document.getElementById('err').style.display = active ? 'none' : '';
+    document.getElementById('hdr-r').style.display = active ? 'none' : '';
+  }
+
   function generateWithTimer() {
+    cancelGeneration = false;
     document.getElementById('hdr').style.display = '';
     startGenTimer();
     updateUI();
+    setGeneratingUI(true);
     setTimeout(async () => {
       await placeArrows();
       stopGenTimer();
+      setGeneratingUI(false);
       render();
     }, 50);
   }
