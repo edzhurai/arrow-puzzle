@@ -223,6 +223,7 @@
     <label>Dots <select id="dp-dots"><option value="">Use Settings</option><option value="show">Show</option><option value="hide">Hide</option></select></label>
     <div class="dp-section">
       <label class="dp-cb"><input type="checkbox" id="dp-preserve"> Preserve on refresh</label>
+      <label class="dp-cb"><input type="checkbox" id="dp-sidebar" onchange="toggleDevSidebar(this.checked)"> Show sidebar</label>
     </div>
     <div class="btns">
       <button class="close" onclick="closeDevPanel()">Close</button>
@@ -235,6 +236,11 @@
 <div id="dev-sidebar" style="display:none"></div>
 <script>
   let devMode = false;
+  let devSidebarVisible = (function() {
+    const s = localStorage.getItem('devSidebarVisible');
+    if (s !== null) return s === '1';
+    return window.innerWidth >= 500;
+  })();
   let devParams = { cols: 15, rows: 15, fill: 'normal', arrows: 35, minSeg: 1, maxSeg: 5, minBends: 0, maxBends: 4, nminMin: 2, nminMax: 4, timeout: 5, color: '', dots: '' };
   let isLayingOut = false;
   let showDots = true;
@@ -1363,6 +1369,7 @@
     document.getElementById('dp-timeout').value = devParams.timeout;
     document.getElementById('dp-color').value = devParams.color;
     document.getElementById('dp-dots').value = devParams.dots;
+    document.getElementById('dp-sidebar').checked = devSidebarVisible;
     document.getElementById('devpanel').style.display = 'flex';
   }
 
@@ -1390,9 +1397,15 @@
     document.getElementById('devpanel').style.display = 'none';
   }
 
+  function toggleDevSidebar(checked) {
+    devSidebarVisible = checked;
+    localStorage.setItem('devSidebarVisible', checked ? '1' : '0');
+    updateDevSidebar();
+  }
+
   function updateDevSidebar() {
     const sb = document.getElementById('dev-sidebar');
-    if (!devMode) { sb.style.display = 'none'; return; }
+    if (!devMode || !devSidebarVisible) { sb.style.display = 'none'; return; }
     const ep = getEffectiveParams();
     sb.style.display = '';
     sb.innerHTML =
