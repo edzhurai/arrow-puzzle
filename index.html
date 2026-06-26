@@ -763,9 +763,9 @@
 
   function drawArrow(a, offX, offY, color, glow) {
     const p = a.path;
-    const lineW = Math.max(3, spacing * 0.1);
-    const headLen = Math.max(6, spacing * 0.18);
-    const headW = Math.max(5, spacing * 0.12);
+    const lineW = Math.max(6, spacing * 0.2);
+    const headLen = Math.max(9, spacing * 0.27);
+    const headW = Math.max(8, spacing * 0.18);
     const dir = headDir(a);
     const perpX = -DY[dir];
     const perpY = DX[dir];
@@ -832,9 +832,9 @@
     const pts = [];
     for (let i = 0; i < p.length; i++) pts.push(posOnPath(p, dir, t + i));
 
-    const lineW = Math.max(3, spacing * 0.1);
-    const headLen = Math.max(6, spacing * 0.18);
-    const headW = Math.max(5, spacing * 0.12);
+    const lineW = Math.max(6, spacing * 0.2);
+    const headLen = Math.max(9, spacing * 0.27);
+    const headW = Math.max(8, spacing * 0.18);
     const tip = pts[pts.length - 1];
     const pre = pts[pts.length - 2];
     const hdx = tip.x - pre.x, hdy = tip.y - pre.y;
@@ -1107,14 +1107,11 @@
   });
   canvas.addEventListener('mousemove', (e) => {
     if (!dragging) return;
-    const dx = e.clientX - mouseLastX;
-    const dy = e.clientY - mouseLastY;
     mouseLastX = e.clientX;
     mouseLastY = e.clientY;
     if (!dragMoved && Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) > 3) {
       dragMoved = true;
     }
-    if (dragMoved) { camOffX += dx; camOffY += dy; clampCam(); render(); }
   });
   window.addEventListener('mouseup', (e) => {
     if (dragging && !dragMoved) handleClick(e.clientX, e.clientY);
@@ -1158,12 +1155,6 @@
       const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
       if (!touchMoved && Math.hypot(tx - touchStartX, ty - touchStartY) > 8) {
         touchMoved = true;
-      }
-      if (touchMoved) {
-        camOffX += tx - lastTouchX;
-        camOffY += ty - lastTouchY;
-        clampCam();
-        render();
       }
       lastTouchX = tx; lastTouchY = ty;
     } else if (e.touches.length === 2) {
