@@ -167,14 +167,22 @@
 <canvas id="c"></canvas>
 <div id="start-screen"><button onclick="startGame()">Start</button></div>
 <div id="hdr" style="display:none">
-  <span id="lvl">Level 1</span>
-  <button class="hdr-btn" onclick="showDevPw()" style="font-size:10px;padding:3px 6px;opacity:0.5">DEV</button>
-  <span id="err">Errors: 0</span>
-  <span id="gen-timer"></span>
-  <button id="cancel-gen" class="hdr-btn" style="display:none;background:rgba(233,69,96,0.6)" onclick="cancelGeneration=true">Stop</button>
+  <span id="hdr-play-left" style="display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden">
+    <span id="lvl">Level 1</span>
+    <button class="hdr-btn" onclick="showDevPw()" style="font-size:10px;padding:3px 6px;opacity:0.5">DEV</button>
+    <span id="err">Errors: 0</span>
+    <span id="gen-timer"></span>
+    <button id="cancel-gen" class="hdr-btn" style="display:none;background:rgba(233,69,96,0.6)" onclick="cancelGeneration=true">Stop</button>
+  </span>
+  <span id="hdr-edit-left" style="display:none;align-items:center;gap:6px">
+    <span style="font-size:13px;font-weight:bold;color:#ffd700">&#9998; Editing</span>
+    <span id="edit-free" style="font-size:12px;color:rgba(255,255,255,0.7)"></span>
+  </span>
   <div id="hdr-r">
     <button id="hint-btn" class="hdr-btn" onclick="useHint()">Hint</button>
     <button id="dots-btn" class="hdr-btn" onclick="toggleDots()" style="font-size:16px;padding:3px 8px">&#183;</button>
+    <button id="edit-btn" class="hdr-btn" onclick="toggleEditMode()" style="font-size:15px;padding:3px 8px">&#9998;</button>
+    <button id="edit-done-btn" class="hdr-btn" onclick="doneEditing()" style="display:none;background:rgba(74,222,128,0.3)">Done &#10003;</button>
     <button id="gear" onclick="toggleSettings()">&#9881;</button>
   </div>
 </div>
@@ -936,6 +944,7 @@
       }
     }
 
+    if (editMode) drawEditOverlay();
     ctx.restore();
   }
 
@@ -1104,6 +1113,7 @@
     dragMoved = false;
     dragStartX = mouseLastX = e.clientX;
     dragStartY = mouseLastY = e.clientY;
+    if (editMode) startEditLongPress(e.clientX, e.clientY);
   });
   canvas.addEventListener('mousemove', (e) => {
     if (!dragging) return;
@@ -1113,11 +1123,16 @@
     mouseLastY = e.clientY;
     if (!dragMoved && Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) > 3) {
       dragMoved = true;
+      clearEditLongPress();
     }
     if (dragMoved) { camOffX += dx; camOffY += dy; clampCam(); render(); }
   });
   window.addEventListener('mouseup', (e) => {
-    if (dragging && !dragMoved) handleClick(e.clientX, e.clientY);
+    clearEditLongPress();
+    if (dragging && !dragMoved) {
+      if (editMode) { const dot = nearestDot(e.clientX, e.clientY); if (dot) handleEditTap(dot.c, dot.r); }
+      else handleClick(e.clientX, e.clientY);
+    }
     dragging = false; dragMoved = false;
   });
   canvas.addEventListener('mouseleave', () => { dragging = false; dragMoved = false; });
@@ -1142,8 +1157,10 @@
       touchStartX = lastTouchX = e.touches[0].clientX;
       touchStartY = lastTouchY = e.touches[0].clientY;
       touchMoved = false;
+      if (editMode) startEditLongPress(e.touches[0].clientX, e.touches[0].clientY);
     } else if (e.touches.length === 2) {
       touchMoved = true;
+      clearEditLongPress();
       lastPinchDist = Math.hypot(
         e.touches[1].clientX - e.touches[0].clientX,
         e.touches[1].clientY - e.touches[0].clientY);
@@ -1158,6 +1175,7 @@
       const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
       if (!touchMoved && Math.hypot(tx - touchStartX, ty - touchStartY) > 8) {
         touchMoved = true;
+        clearEditLongPress();
       }
       if (touchMoved) {
         camOffX += tx - lastTouchX;
@@ -1185,13 +1203,19 @@
   let lastTapTime = 0;
   canvas.addEventListener('touchend', (e) => {
     e.preventDefault();
+    clearEditLongPress();
     if (e.touches.length === 0 && !touchMoved) {
       const t = e.changedTouches[0];
-      const hit = handleClick(t.clientX, t.clientY);
-      if (!hit) {
-        const now = Date.now();
-        if (now - lastTapTime < 300) { resetCam(); render(); lastTapTime = 0; }
-        else { lastTapTime = now; }
+      if (editMode) {
+        const dot = nearestDot(t.clientX, t.clientY);
+        if (dot) handleEditTap(dot.c, dot.r);
+      } else {
+        const hit = handleClick(t.clientX, t.clientY);
+        if (!hit) {
+          const now = Date.now();
+          if (now - lastTapTime < 300) { resetCam(); render(); lastTapTime = 0; }
+          else { lastTapTime = now; }
+        }
       }
     }
     if (e.touches.length === 1) {
@@ -1512,8 +1536,10 @@
 
   function setGeneratingUI(active) {
     document.getElementById('cancel-gen').style.display = active ? '' : 'none';
-    document.getElementById('err').style.display = active ? 'none' : '';
-    document.getElementById('hdr-r').style.display = active ? 'none' : '';
+    if (!editMode) {
+      document.getElementById('err').style.display = active ? 'none' : '';
+      document.getElementById('hdr-r').style.display = active ? 'none' : '';
+    }
   }
 
   function generateWithTimer() {
@@ -1560,6 +1586,214 @@
     btn.classList.add('btn-active');
     setTimeout(() => btn.classList.remove('btn-active'), 150);
   });
+
+  // ===== EDIT MODE =====
+
+  let editMode = false;
+  let editStep = 'idle'; // 'idle' | 'placing' | 'selected'
+  let editPathDots = [];
+  let editSelectedIdx = -1;
+  let editLongPressTimer = null;
+
+  function editGetOccupied() {
+    const s = new Set();
+    for (const a of arrows) { if (a.alive) for (const p of a.path) s.add(`${p.c},${p.r}`); }
+    return s;
+  }
+
+  function nearestDot(px, py) {
+    const wx = (px - camOffX) / camScale;
+    const wy = (py - camOffY) / camScale;
+    const c = Math.round((wx - originX) / spacing);
+    const r = Math.round((wy - originY) / spacing);
+    if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return null;
+    const ddx = wx - gx(c), ddy = wy - gy(r);
+    if (Math.sqrt(ddx * ddx + ddy * ddy) > spacing * 0.5) return null;
+    return { c, r };
+  }
+
+  function editFindArrowAtDot(c, r) {
+    for (let i = 0; i < arrows.length; i++) {
+      if (!arrows[i].alive) continue;
+      for (const p of arrows[i].path) if (p.c === c && p.r === r) return i;
+    }
+    return -1;
+  }
+
+  function editSegmentDots(from, to) {
+    if (from.c !== to.c && from.r !== to.r) return null;
+    const dots = [];
+    if (from.c === to.c) {
+      const step = to.r > from.r ? 1 : -1;
+      for (let rv = from.r; rv !== to.r + step; rv += step) dots.push({ c: from.c, r: rv });
+    } else {
+      const step = to.c > from.c ? 1 : -1;
+      for (let cv = from.c; cv !== to.c + step; cv += step) dots.push({ c: cv, r: from.r });
+    }
+    return dots;
+  }
+
+  function editPathExtreme(path) {
+    if (path.length < 2) return true;
+    const last = path[path.length - 1];
+    const prev = path[path.length - 2];
+    const hdc = Math.sign(last.c - prev.c);
+    const hdr = Math.sign(last.r - prev.r);
+    const headProj = hdc * last.c + hdr * last.r;
+    for (const p of path) if (hdc * p.c + hdr * p.r > headProj) return false;
+    return true;
+  }
+
+  function handleEditTap(col, row) {
+    const occ = editGetOccupied();
+
+    if (editStep === 'idle') {
+      const idx = editFindArrowAtDot(col, row);
+      if (idx >= 0) { editStep = 'selected'; editSelectedIdx = idx; render(); return; }
+      if (occ.has(`${col},${row}`)) return;
+      editStep = 'placing';
+      editPathDots = [{ c: col, r: row }];
+      render();
+      return;
+    }
+
+    if (editStep === 'placing') {
+      const last = editPathDots[editPathDots.length - 1];
+      if (col === last.c && row === last.r) {
+        if (editPathDots.length >= 2) finalizeEditArrow();
+        else { editStep = 'idle'; editPathDots = []; render(); }
+        return;
+      }
+      if (col !== last.c && row !== last.r) return;
+      const seg = editSegmentDots(last, { c: col, r: row });
+      if (!seg || seg.length < 2) return;
+      const pathSet = new Set(editPathDots.map(p => `${p.c},${p.r}`));
+      for (let i = 1; i < seg.length; i++) {
+        const k = `${seg[i].c},${seg[i].r}`;
+        if (occ.has(k) || pathSet.has(k)) return;
+      }
+      const newPath = [...editPathDots, ...seg.slice(1)];
+      if (!editPathExtreme(newPath)) return;
+      editPathDots = newPath;
+      render();
+      return;
+    }
+
+    if (editStep === 'selected') {
+      const idx = editSelectedIdx;
+      editStep = 'idle'; editSelectedIdx = -1;
+      const a = arrows[idx];
+      if (a && a.alive) {
+        const tail = a.path[0];
+        if (Math.abs(col - tail.c) + Math.abs(row - tail.r) === 1 && !occ.has(`${col},${row}`)) {
+          const newPath = [{ c: col, r: row }, ...a.path];
+          if (editPathExtreme(newPath)) {
+            a.path = newPath;
+            updateEditUI(); render(); return;
+          }
+        }
+      }
+      render();
+      handleEditTap(col, row);
+    }
+  }
+
+  function finalizeEditArrow() {
+    if (editPathDots.length < 2) { editStep = 'idle'; editPathDots = []; render(); return; }
+    const na = { path: editPathDots.map(p => ({ c: p.c, r: p.r })), alive: true, stuck: false, glowing: false };
+    for (const a of arrows) {
+      if (!a.alive) continue;
+      if (headsConflict(na, a)) { editStep = 'idle'; editPathDots = []; render(); return; }
+    }
+    arrows.push(na);
+    editStep = 'idle'; editPathDots = [];
+    updateEditUI(); render();
+  }
+
+  function handleEditLongPress(px, py) {
+    const wx = (px - camOffX) / camScale;
+    const wy = (py - camOffY) / camScale;
+    for (let i = 0; i < arrows.length; i++) {
+      if (!arrows[i].alive) continue;
+      if (hitTest(wx, wy, arrows[i])) {
+        arrows.splice(i, 1);
+        if (editSelectedIdx >= i) editSelectedIdx = -1;
+        editStep = 'idle'; editPathDots = [];
+        updateEditUI(); render(); return;
+      }
+    }
+  }
+
+  function startEditLongPress(px, py) {
+    clearEditLongPress();
+    editLongPressTimer = setTimeout(() => { editLongPressTimer = null; handleEditLongPress(px, py); }, 500);
+  }
+
+  function clearEditLongPress() {
+    if (editLongPressTimer) { clearTimeout(editLongPressTimer); editLongPressTimer = null; }
+  }
+
+  function toggleEditMode() {
+    if (genTimerInterval) return;
+    if (editMode) { doneEditing(); return; }
+    editMode = true; editStep = 'idle'; editPathDots = []; editSelectedIdx = -1;
+    if (animLoop) { cancelAnimationFrame(animLoop); animLoop = null; }
+    anims.clear();
+    for (const a of arrows) { a.alive = true; a.stuck = false; a.glowing = false; }
+    cleared = false;
+    updateEditUI(); render();
+  }
+
+  function doneEditing() {
+    if (editStep === 'placing' && editPathDots.length >= 2) finalizeEditArrow();
+    editStep = 'idle'; editPathDots = []; editSelectedIdx = -1;
+    editMode = false;
+    const solvable = isSolvable(arrows);
+    console.log('Done editing: ' + arrows.length + ' arrows, solvable=' + solvable + ', free=' + countFree(arrows));
+    updateEditUI(); updateUI(); render();
+  }
+
+  function updateEditUI() {
+    document.getElementById('hdr-play-left').style.display = editMode ? 'none' : 'flex';
+    document.getElementById('hdr-edit-left').style.display = editMode ? 'flex' : 'none';
+    document.getElementById('hint-btn').style.display = editMode ? 'none' : '';
+    document.getElementById('edit-done-btn').style.display = editMode ? '' : 'none';
+    document.getElementById('edit-btn').classList.toggle('btn-active', editMode);
+    if (editMode) {
+      const free = countFree(arrows.filter(a => a.alive));
+      document.getElementById('edit-free').textContent = '· ' + free + ' free';
+    }
+  }
+
+  function drawEditOverlay() {
+    const occ = editGetOccupied();
+    const dotR = Math.max(4, spacing * 0.1);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (!occ.has(`${c},${r}`)) {
+          ctx.beginPath();
+          ctx.arc(gx(c), gy(r), dotR, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    if (editStep === 'placing' && editPathDots.length >= 1) {
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+      if (editPathDots.length === 1) {
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        ctx.arc(gx(editPathDots[0].c), gy(editPathDots[0].r), Math.max(6, spacing * 0.18), 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        drawArrow({ path: editPathDots, alive: true, stuck: false, glowing: false }, 0, 0, '#ffd700', false);
+      }
+    }
+    if (editStep === 'selected' && editSelectedIdx >= 0 && editSelectedIdx < arrows.length) {
+      const a = arrows[editSelectedIdx];
+      if (a && a.alive) drawArrow(a, 0, 0, '#ffffff', true);
+    }
+  }
 
   requestAnimationFrame(() => { requestAnimationFrame(() => { init(); }); });
   window.addEventListener('resize', () => {
