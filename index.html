@@ -445,7 +445,6 @@
 
   function isArrowFree(idx, arrowList) {
     const a = arrowList[idx];
-    if (a.path.length === 1) return true;
     const dir = headDir(a);
     const head = a.path[a.path.length - 1];
     const otherDots = new Set();
@@ -564,7 +563,6 @@
     }
     let free = 0;
     for (let i = 0; i < list.length; i++) {
-      if (list[i].path.length === 1) { free++; continue; }
       const head = list[i].path[list[i].path.length - 1];
       const d = dirs[i];
       let blocked = false;
@@ -1057,7 +1055,6 @@
 
   function blockerDist(idx) {
     const a = arrows[idx];
-    if (a.path.length === 1) return -1;
     const dir = headDir(a);
     const head = a.path[a.path.length - 1];
     const otherDots = new Set();
