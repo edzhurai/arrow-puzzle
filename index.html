@@ -297,6 +297,8 @@
 
   let spacing, originX, originY;
   let arrows = [];
+  let holes = [];
+  const MAX_HOLES = 4;
   let cleared = false;
   let camScale = 1, camOffX = 0, camOffY = 0;
   const anims = new Map();
@@ -339,22 +341,25 @@
     }
   }
 
-  function makeZeroLenArrow(c, r) {
-    return { path: [{ c, r }], alive: true, stuck: false, glowing: false, dir: randInt(0, 3) };
-  }
-
-  function pickRandomUnoccupiedDot(occupied) {
-    const avail = [];
-    for (let r = 0; r < ROWS; r++)
-      for (let c = 0; c < COLS; c++)
-        if (!occupied.has(`${c},${r}`)) avail.push({ c, r });
-    if (avail.length === 0) return null;
-    return avail[randInt(0, avail.length - 1)];
+  function drawHoles() {
+    const r = Math.max(5, spacing * 0.22);
+    for (const h of holes) {
+      const x = gx(h.c), y = gy(h.r);
+      const grad = ctx.createRadialGradient(x, y, r * 0.1, x, y, r);
+      grad.addColorStop(0, '#000000');
+      grad.addColorStop(1, '#1c1c33');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
   }
 
   function headDir(a) {
     const p = a.path;
-    if (p.length === 1) return a.dir;
     const last = p[p.length - 1];
     const prev = p[p.length - 2];
     const dc = last.c - prev.c;
@@ -433,7 +438,6 @@
   }
 
   function headsConflict(a, b) {
-    if (a.path.length === 1 || b.path.length === 1) return false;
     const da = headDir(a);
     const db = headDir(b);
     if ((da + 2) % 4 !== db) return false;
@@ -461,7 +465,7 @@
   }
 
   function isSolvable(list) {
-    const remaining = list.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false, dir: a.dir }));
+    const remaining = list.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false }));
     while (remaining.length > 0) {
       let found = false;
       for (let i = 0; i < remaining.length; i++) {
@@ -526,12 +530,6 @@
           placed = true;
           break;
         }
-      }
-      if (!placed) {
-        // isolated dot: no neighbor is free, use a zero-length arrow
-        fillers.push(makeZeroLenArrow(c, r));
-        used.add(key);
-        placed = true;
       }
     }
     return fillers;
@@ -683,7 +681,7 @@
           for (let j = i + 1; j < all.length && !candidateConflict; j++)
             if (headsConflict(all[i], all[j])) candidateConflict = true;
         if (!candidateConflict) {
-          best = all.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false, dir: a.dir }));
+          best = all.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false }));
           bestCov = occupied.size;
         }
       }
@@ -743,15 +741,7 @@
 
       for (let n = 0; n < N; n++) {
         let placed = false;
-        if (Math.random() < 0.1) {
-          const dot = pickRandomUnoccupiedDot(occupied);
-          if (dot) {
-            generated.push(makeZeroLenArrow(dot.c, dot.r));
-            occupied.add(`${dot.c},${dot.r}`);
-            placed = true;
-          }
-        }
-        if (!placed) for (let retry = 0; retry < 50; retry++) {
+        for (let retry = 0; retry < 50; retry++) {
           const bends = randBends();
           const candidate = generateArrow(bends, occupied, segOpts);
           if (!candidate) continue;
@@ -793,16 +783,68 @@
     console.log('placeArrows: COLS=' + COLS + ' ROWS=' + ROWS + ' fill=' + ep.fill + ' devMode=' + devMode);
     if (ep.fill === 'full') await placeArrowsFull();
     else await placeArrowsNormal();
+    placeHoles();
     const _cov = new Set();
     for (const a of arrows) for (const p of a.path) _cov.add(`${p.c},${p.r}`);
-    console.log('Generated: ' + arrows.length + ' arrows, ' + _cov.size + '/' + (COLS * ROWS) + ' dots (' + (_cov.size / (COLS * ROWS) * 100).toFixed(1) + '%), Nmin=' + countFree(arrows));
+    console.log('Generated: ' + arrows.length + ' arrows, ' + _cov.size + '/' + (COLS * ROWS) + ' dots (' + (_cov.size / (COLS * ROWS) * 100).toFixed(1) + '%), Nmin=' + countFree(arrows) + ', holes=' + holes.length);
+  }
+
+  function placeHoles() {
+    holes = [];
+    const occupied = new Set();
+    for (const a of arrows) for (const p of a.path) occupied.add(`${p.c},${p.r}`);
+    const candidates = new Set();
+    for (const a of arrows) {
+      const dir = headDir(a);
+      const head = a.path[a.path.length - 1];
+      let c = head.c + DX[dir], r = head.r + DY[dir];
+      while (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+        const key = `${c},${r}`;
+        if (!occupied.has(key)) candidates.add(key);
+        c += DX[dir]; r += DY[dir];
+      }
+    }
+    const candList = [...candidates];
+    if (candList.length === 0) return;
+    for (let i = candList.length - 1; i > 0; i--) {
+      const j = randInt(0, i);
+      [candList[i], candList[j]] = [candList[j], candList[i]];
+    }
+    const count = Math.min(candList.length, randInt(1, MAX_HOLES));
+    for (let i = 0; i < count; i++) {
+      const [c, r] = candList[i].split(',').map(Number);
+      holes.push({ c, r });
+    }
+  }
+
+  function isHole(c, r) {
+    for (const h of holes) if (h.c === c && h.r === r) return true;
+    return false;
+  }
+
+  function holeAtForward(idx) {
+    const a = arrows[idx];
+    const dir = headDir(a);
+    const head = a.path[a.path.length - 1];
+    let c = head.c + DX[dir], r = head.r + DY[dir];
+    while (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+      if (isHole(c, r)) return { c, r };
+      c += DX[dir]; r += DY[dir];
+    }
+    return null;
+  }
+
+  function arrowSizes() {
+    return {
+      lineW: Math.max(6, spacing * 0.2),
+      headLen: Math.max(12, spacing * 0.36),
+      headW: Math.max(10, spacing * 0.24)
+    };
   }
 
   function drawArrow(a, offX, offY, color, glow) {
     const p = a.path;
-    const lineW = Math.max(3, spacing * 0.1);
-    const headLen = Math.max(6, spacing * 0.18);
-    const headW = Math.max(5, spacing * 0.12);
+    const { lineW, headLen, headW } = arrowSizes();
     const dir = headDir(a);
     const perpX = -DY[dir];
     const perpY = DX[dir];
@@ -865,15 +907,16 @@
     }
   }
 
-  function drawSlidingArrow(a, t, color, glow) {
+  function computeSlidePoints(a, t) {
     const p = a.path;
     const dir = headDir(a);
     const pts = [];
     for (let i = 0; i < p.length; i++) pts.push(posOnPath(p, dir, t + i));
+    return pts;
+  }
 
-    const lineW = Math.max(3, spacing * 0.1);
-    const headLen = Math.max(6, spacing * 0.18);
-    const headW = Math.max(5, spacing * 0.12);
+  function drawArrowShapeFromPoints(pts, color, glow) {
+    const { lineW, headLen, headW } = arrowSizes();
     const tip = pts[pts.length - 1];
     const pre = pts[pts.length - 2];
     const hdx = tip.x - pre.x, hdy = tip.y - pre.y;
@@ -905,6 +948,46 @@
     if (glow) { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; }
   }
 
+  function drawSlidingArrow(a, t, color, glow) {
+    const pts = computeSlidePoints(a, t);
+    drawArrowShapeFromPoints(pts, color, glow);
+  }
+
+  function drawSinkingArrow(a, anim, color, glow) {
+    // Only the arrowhead spirals into the hole — using the full shaft here would
+    // sweep a long tail across the screen as it rotates.
+    const pts = computeSlidePoints(a, anim.totalDist);
+    const tip = pts[pts.length - 1];
+    const pre = pts[pts.length - 2];
+    const hdx = tip.x - pre.x, hdy = tip.y - pre.y;
+    const hlen = Math.sqrt(hdx * hdx + hdy * hdy) || 1;
+    const ux = hdx / hlen, uy = hdy / hlen;
+    const perpX = -uy, perpY = ux;
+    const { headLen, headW } = arrowSizes();
+    const bx = tip.x - ux * headLen, by = tip.y - uy * headLen;
+    const scale = Math.max(0, 1 - anim.shrinkT);
+    const angle = anim.shrinkT * Math.PI * 3;
+
+    ctx.save();
+    ctx.globalAlpha = scale;
+    ctx.translate(tip.x, tip.y);
+    ctx.rotate(angle);
+    ctx.scale(scale, scale);
+    ctx.translate(-tip.x, -tip.y);
+
+    if (glow) { ctx.shadowColor = '#ffffff'; ctx.shadowBlur = spacing * 0.4; }
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(tip.x, tip.y);
+    ctx.lineTo(bx + perpX * headW, by + perpY * headW);
+    ctx.lineTo(bx - perpX * headW, by - perpY * headW);
+    ctx.closePath();
+    ctx.fill();
+    if (glow) { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; }
+
+    ctx.restore();
+  }
+
   function flyDistance(a) {
     const dir = headDir(a);
     let maxDist = 0;
@@ -922,10 +1005,6 @@
   }
 
   function hitTest(px, py, a) {
-    if (a.path.length === 1) {
-      const x = gx(a.path[0].c), y = gy(a.path[0].r);
-      return Math.hypot(px - x, py - y) < Math.max(12, spacing * 0.45);
-    }
     for (let i = 0; i < a.path.length - 1; i++) {
       const x1 = gx(a.path[i].c), y1 = gy(a.path[i].r);
       const x2 = gx(a.path[i + 1].c), y2 = gy(a.path[i + 1].r);
@@ -948,6 +1027,7 @@
     ctx.setTransform(camScale, 0, 0, camScale, camOffX, camOffY);
 
     drawDots();
+    drawHoles();
 
     ctx.save();
     const clipPad = spacing * 0.3;
@@ -974,6 +1054,9 @@
       else if (arrows[i].stuck) { color = '#ffffff'; }
       if (anim.type === 'fly') {
         drawSlidingArrow(arrows[i], anim.slideT, color, glow);
+      } else if (anim.type === 'sink') {
+        if (anim.phase === 'slide') drawSlidingArrow(arrows[i], anim.slideT, color, glow);
+        else drawSinkingArrow(arrows[i], anim, color, glow);
       } else {
         drawArrow(arrows[i], anim.offX, anim.offY, color, glow);
       }
@@ -992,20 +1075,28 @@
         const et = t * t * (3 - 2 * t);
         if (anim.type === 'fly') {
           anim.slideT = et * anim.totalDist;
+          if (t >= 1) { anims.delete(idx); arrows[idx].alive = false; }
+          else anyActive = true;
+        } else if (anim.type === 'sink') {
+          if (anim.phase === 'slide') {
+            anim.slideT = et * anim.totalDist;
+            if (t >= 1) {
+              anim.phase = 'shrink';
+              anim.startTime = now;
+              anim.duration = 320;
+            }
+            anyActive = true;
+          } else {
+            anim.shrinkT = et;
+            if (t >= 1) { anims.delete(idx); arrows[idx].alive = false; }
+            else anyActive = true;
+          }
         } else {
           const phase = t < 0.5 ? t * 2 : 2 - t * 2;
           anim.offX = anim.dx * anim.bounceDist * phase;
           anim.offY = anim.dy * anim.bounceDist * phase;
-        }
-        if (t >= 1) {
-          anims.delete(idx);
-          if (anim.type === 'fly') {
-            arrows[idx].alive = false;
-          } else {
-            arrows[idx].stuck = true;
-          }
-        } else {
-          anyActive = true;
+          if (t >= 1) { anims.delete(idx); arrows[idx].stuck = true; }
+          else anyActive = true;
         }
       }
       render();
@@ -1025,16 +1116,6 @@
 
   function fly(idx) {
     const a = arrows[idx];
-    if (a.path.length === 1) {
-      a.alive = false;
-      render();
-      if (arrows.every(x => !x.alive)) {
-        cleared = true;
-        render();
-        showClearScreen();
-      }
-      return;
-    }
     const dir = headDir(a);
     const pathLen = a.path.length - 1;
     const head = a.path[pathLen];
@@ -1050,6 +1131,26 @@
     const speed = spacing * 24;
     const duration = Math.max(80, (totalPixels / speed) * 1000);
     anims.set(idx, { type: 'fly', startTime: performance.now(), duration, totalDist, slideT: 0 });
+    startAnimLoop();
+  }
+
+  function sink(idx, holeCell) {
+    const a = arrows[idx];
+    const dir = headDir(a);
+    const pathLen = a.path.length - 1;
+    const head = a.path[pathLen];
+    let distToHole;
+    switch (dir) {
+      case 0: distToHole = head.r - holeCell.r; break;
+      case 1: distToHole = holeCell.c - head.c; break;
+      case 2: distToHole = holeCell.r - head.r; break;
+      case 3: distToHole = head.c - holeCell.c; break;
+    }
+    const totalDist = pathLen + distToHole;
+    const totalPixels = distToHole * spacing;
+    const speed = spacing * 24;
+    const duration = Math.max(80, (totalPixels / speed) * 1000);
+    anims.set(idx, { type: 'sink', phase: 'slide', startTime: performance.now(), duration, totalDist, slideT: 0, shrinkT: 0 });
     startAnimLoop();
   }
 
@@ -1140,7 +1241,9 @@
           updateUI();
           bounce(i, dist);
         } else {
-          fly(i);
+          const hole = holeAtForward(i);
+          if (hole) sink(i, hole);
+          else fly(i);
         }
         return true;
       }
@@ -1643,6 +1746,7 @@
   function editGetOccupied() {
     const s = new Set();
     for (const a of arrows) { if (a.alive) for (const p of a.path) s.add(`${p.c},${p.r}`); }
+    for (const h of holes) s.add(`${h.c},${h.r}`);
     return s;
   }
 
