@@ -339,8 +339,22 @@
     }
   }
 
+  function makeZeroLenArrow(c, r) {
+    return { path: [{ c, r }], alive: true, stuck: false, glowing: false, dir: randInt(0, 3) };
+  }
+
+  function pickRandomUnoccupiedDot(occupied) {
+    const avail = [];
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (!occupied.has(`${c},${r}`)) avail.push({ c, r });
+    if (avail.length === 0) return null;
+    return avail[randInt(0, avail.length - 1)];
+  }
+
   function headDir(a) {
     const p = a.path;
+    if (p.length === 1) return a.dir;
     const last = p[p.length - 1];
     const prev = p[p.length - 2];
     const dc = last.c - prev.c;
@@ -419,6 +433,7 @@
   }
 
   function headsConflict(a, b) {
+    if (a.path.length === 1 || b.path.length === 1) return false;
     const da = headDir(a);
     const db = headDir(b);
     if ((da + 2) % 4 !== db) return false;
@@ -430,6 +445,7 @@
 
   function isArrowFree(idx, arrowList) {
     const a = arrowList[idx];
+    if (a.path.length === 1) return true;
     const dir = headDir(a);
     const head = a.path[a.path.length - 1];
     const otherDots = new Set();
@@ -446,7 +462,7 @@
   }
 
   function isSolvable(list) {
-    const remaining = list.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false }));
+    const remaining = list.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false, dir: a.dir }));
     while (remaining.length > 0) {
       let found = false;
       for (let i = 0; i < remaining.length; i++) {
@@ -512,6 +528,12 @@
           break;
         }
       }
+      if (!placed) {
+        // isolated dot: no neighbor is free, use a zero-length arrow
+        fillers.push(makeZeroLenArrow(c, r));
+        used.add(key);
+        placed = true;
+      }
     }
     return fillers;
   }
@@ -542,6 +564,7 @@
     }
     let free = 0;
     for (let i = 0; i < list.length; i++) {
+      if (list[i].path.length === 1) { free++; continue; }
       const head = list[i].path[list[i].path.length - 1];
       const d = dirs[i];
       let blocked = false;
@@ -662,7 +685,7 @@
           for (let j = i + 1; j < all.length && !candidateConflict; j++)
             if (headsConflict(all[i], all[j])) candidateConflict = true;
         if (!candidateConflict) {
-          best = all.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false }));
+          best = all.map(a => ({ path: a.path.slice(), alive: true, stuck: false, glowing: false, dir: a.dir }));
           bestCov = occupied.size;
         }
       }
@@ -722,7 +745,15 @@
 
       for (let n = 0; n < N; n++) {
         let placed = false;
-        for (let retry = 0; retry < 50; retry++) {
+        if (Math.random() < 0.1) {
+          const dot = pickRandomUnoccupiedDot(occupied);
+          if (dot) {
+            generated.push(makeZeroLenArrow(dot.c, dot.r));
+            occupied.add(`${dot.c},${dot.r}`);
+            placed = true;
+          }
+        }
+        if (!placed) for (let retry = 0; retry < 50; retry++) {
           const bends = randBends();
           const candidate = generateArrow(bends, occupied, segOpts);
           if (!candidate) continue;
@@ -788,17 +819,19 @@
       ctx.shadowBlur = spacing * 0.4;
     }
 
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineW;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(gx(p[0].c) + offX, gy(p[0].r) + offY);
-    for (let i = 1; i < p.length - 1; i++) {
-      ctx.lineTo(gx(p[i].c) + offX, gy(p[i].r) + offY);
+    if (p.length > 1) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineW;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(gx(p[0].c) + offX, gy(p[0].r) + offY);
+      for (let i = 1; i < p.length - 1; i++) {
+        ctx.lineTo(gx(p[i].c) + offX, gy(p[i].r) + offY);
+      }
+      ctx.lineTo(baseX, baseY);
+      ctx.stroke();
     }
-    ctx.lineTo(baseX, baseY);
-    ctx.stroke();
 
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -891,6 +924,10 @@
   }
 
   function hitTest(px, py, a) {
+    if (a.path.length === 1) {
+      const x = gx(a.path[0].c), y = gy(a.path[0].r);
+      return Math.hypot(px - x, py - y) < Math.max(12, spacing * 0.45);
+    }
     for (let i = 0; i < a.path.length - 1; i++) {
       const x1 = gx(a.path[i].c), y1 = gy(a.path[i].r);
       const x2 = gx(a.path[i + 1].c), y2 = gy(a.path[i + 1].r);
@@ -990,6 +1027,16 @@
 
   function fly(idx) {
     const a = arrows[idx];
+    if (a.path.length === 1) {
+      a.alive = false;
+      render();
+      if (arrows.every(x => !x.alive)) {
+        cleared = true;
+        render();
+        showClearScreen();
+      }
+      return;
+    }
     const dir = headDir(a);
     const pathLen = a.path.length - 1;
     const head = a.path[pathLen];
@@ -1010,6 +1057,7 @@
 
   function blockerDist(idx) {
     const a = arrows[idx];
+    if (a.path.length === 1) return -1;
     const dir = headDir(a);
     const head = a.path[a.path.length - 1];
     const otherDots = new Set();
