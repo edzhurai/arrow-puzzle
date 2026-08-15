@@ -1167,6 +1167,7 @@
     let c = head.c + DX[dir], r = head.r + DY[dir];
     let dist = 1;
     while (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+      if (isHole(c, r)) return -1;
       if (otherDots.has(`${c},${r}`)) return dist;
       c += DX[dir]; r += DY[dir];
       dist++;
