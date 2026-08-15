@@ -298,7 +298,8 @@
   let spacing, originX, originY;
   let arrows = [];
   let holes = [];
-  const MAX_HOLES = 4;
+  const MIN_HOLES = 5;
+  const MAX_HOLES = 8;
   let cleared = false;
   let camScale = 1, camOffX = 0, camOffY = 0;
   const anims = new Map();
@@ -811,7 +812,7 @@
       const j = randInt(0, i);
       [candList[i], candList[j]] = [candList[j], candList[i]];
     }
-    const count = Math.min(candList.length, randInt(1, MAX_HOLES));
+    const count = Math.min(candList.length, randInt(MIN_HOLES, MAX_HOLES));
     for (let i = 0; i < count; i++) {
       const [c, r] = candList[i].split(',').map(Number);
       holes.push({ c, r });
