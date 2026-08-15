@@ -800,7 +800,8 @@
       let c = head.c + DX[dir], r = head.r + DY[dir];
       while (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
         const key = `${c},${r}`;
-        if (!occupied.has(key)) candidates.add(key);
+        if (occupied.has(key)) break;
+        candidates.add(key);
         c += DX[dir]; r += DY[dir];
       }
     }
