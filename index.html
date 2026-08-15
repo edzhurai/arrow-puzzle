@@ -1147,11 +1147,10 @@
       case 2: distToHole = holeCell.r - head.r; break;
       case 3: distToHole = head.c - holeCell.c; break;
     }
-    const totalDist = pathLen + distToHole;
     const totalPixels = distToHole * spacing;
     const speed = spacing * 24;
     const duration = Math.max(80, (totalPixels / speed) * 1000);
-    anims.set(idx, { type: 'sink', phase: 'slide', startTime: performance.now(), duration, totalDist, slideT: 0, shrinkT: 0 });
+    anims.set(idx, { type: 'sink', phase: 'slide', startTime: performance.now(), duration, totalDist: distToHole, slideT: 0, shrinkT: 0 });
     startAnimLoop();
   }
 
